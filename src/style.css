@@ -1,0 +1,12 @@
+/* 1. Imports MUST be at the absolute top of the file */
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import "tailwindcss";
+
+/* 2. Global body styles using @apply work here because Tailwind is imported right above */
+body {
+  @apply bg-slate-900 text-slate-100 overflow-hidden;
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
