@@ -6,8 +6,8 @@ import CompletionStats from '../components/CompletionStats.vue'
 import PassageLoader from '../components/PassageLoader.vue'
 import AuthModal from '../components/AuthModal.vue'
 import { fetchPassages } from '../services/api'
-import { stats, settings, currentUser, recordSession } from '../store' // <-- Added recordSession
-import { saveQuoteToArchive } from '../services/firebase' // <-- Added Firebase function
+import { stats, settings, currentUser, recordSession, savePassageHistory } from '../store'
+import { saveQuoteToArchive } from '../services/firebase'
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
@@ -15,8 +15,13 @@ const router = useRouter()
 const quotes = ref([])
 const currentIndex = ref(0)
 const gameState = ref('loading')
-const lastStats = ref(null)
 const showAuthModal = ref(false)
+
+const attemptsArray = ref([])
+const boardKey = ref(0)
+const displayPassageNumber = ref(1) 
+const isFirstCompletionOfPassage = ref(true) 
+const isCurrentQuoteArchived = ref(false) // NEW: Remembers archive state across retries
 
 const activeVisualIndex = computed(() => settings.value.themeMode === 'locked' ? (settings.value.lockedSeason || 0) : getRealWorldSeason())
 const activeSeason = computed(() => seasons[activeVisualIndex.value] || seasons[0])
@@ -35,18 +40,28 @@ const initGame = async () => {
   gameState.value = 'loading'
   try {
     quotes.value = await fetchPassages()
-    currentIndex.value = stats.value.lifetimePassages % quotes.value.length
+    
+    // NEW: Pull the current index based on the SPECIFIC season's passage count, not the lifetime count
+    const seasonalPassageCount = stats.value.seasonal[activeVisualIndex.value]?.passages || 0
+    currentIndex.value = seasonalPassageCount % quotes.value.length
+    displayPassageNumber.value = seasonalPassageCount + 1
+    
+    isFirstCompletionOfPassage.value = true
+    isCurrentQuoteArchived.value = false
     setTimeout(() => { gameState.value = 'playing' }, 1500)
   } catch (error) {
     console.error("Failed to load passages", error)
   }
 }
 
+const handleRestartFromPause = () => {
+  gameState.value = 'playing'
+  boardKey.value++ 
+}
+
 const handleGlobalKey = (e) => {
-  if (gameState.value === 'paused') {
-    if (e.key === 'Enter') {
-      proceedToNext()
-    }
+  if (gameState.value === 'paused' && e.key === 'Enter') {
+    handleRestartFromPause()
   }
 }
 
@@ -62,45 +77,58 @@ onBeforeUnmount(() => {
 watch(currentUser, (newUser) => {
   if (newUser && showAuthModal.value) {
     showAuthModal.value = false
-    if (quotes.value.length === 0) {
-      initGame() 
-    } else {
-      proceedToNext() 
-    }
+    if (quotes.value.length === 0) initGame() 
+    else handleNextPassage() 
   }
 })
 
 const handleModalClose = () => {
   showAuthModal.value = false
-  if (!currentUser.value && stats.value.lifetimePassages >= 3) {
-    router.push('/') 
-  }
+  if (!currentUser.value && stats.value.lifetimePassages >= 3) router.push('/') 
 }
 
 const handlePause = () => { gameState.value = 'paused' }
 const handleResume = () => { gameState.value = 'playing' }
 
 const handleCompletion = (results) => {
-  lastStats.value = results
+  attemptsArray.value.push(results)
   const currentS = activeVisualIndex.value
   
-  stats.value.lifetimePassages++
+  if (isFirstCompletionOfPassage.value) {
+    stats.value.lifetimePassages++
+    if (!stats.value.seasonal[currentS]) stats.value.seasonal[currentS] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
+    stats.value.seasonal[currentS].passages++
+    isFirstCompletionOfPassage.value = false
+  }
+
   stats.value.lifetimeKeystrokes += results.keystrokes
   stats.value.lifetimeMistakes += results.mistakes
-  
-  if (!stats.value.seasonal[currentS]) stats.value.seasonal[currentS] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
-  stats.value.seasonal[currentS].passages++
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  // Notice we removed the automatic array unshift here too
   recordSession()
-  
   gameState.value = 'complete'
 }
 
+const handleRetryPassage = () => {
+  gameState.value = 'playing'
+  boardKey.value++ 
+}
+
 const proceedToNext = () => {
+  if (attemptsArray.value.length > 0) {
+    // NEW: Save with a season-specific ID so the Profile can group them!
+    const passageId = `season_${activeVisualIndex.value}_passage_${displayPassageNumber.value}`
+    savePassageHistory(passageId, [...attemptsArray.value])
+  }
+
+  attemptsArray.value = []
+  isFirstCompletionOfPassage.value = true
+  isCurrentQuoteArchived.value = false // Reset archive state for the new quote
+  displayPassageNumber.value++ 
+
   currentIndex.value = (currentIndex.value + 1) % quotes.value.length
+  boardKey.value++
   gameState.value = 'playing'
 }
 
@@ -109,12 +137,12 @@ const handleNextPassage = () => {
   proceedToNext()
 }
 
-// NEW: Sends the quote to Firebase
 const handleArchiveQuote = async () => {
   if (!currentUser.value) return
   const currentQuote = quotes.value[currentIndex.value]
   if (!currentQuote) return
   await saveQuoteToArchive(currentUser.value.uid, currentQuote.text, currentQuote.author)
+  isCurrentQuoteArchived.value = true // Mark as archived so the button disables across retries
 }
 </script>
 
@@ -123,35 +151,35 @@ const handleArchiveQuote = async () => {
     
     <PassageLoader v-if="gameState === 'loading'" text="Unfolding the path..." />
 
-    <!-- PAUSE MENU OVERLAY -->
     <div v-if="gameState === 'paused'" class="fixed inset-0 z-50 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
       <h3 class="text-4xl tracking-[0.3em] uppercase font-light mb-12 font-ui-serif">Paused</h3>
       <div class="flex flex-col gap-6 w-64 items-center">
         <button @click="handleResume" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Resume <span class="opacity-50 ml-1 text-[9px]">(ESC)</span></span></button>
-        <button @click="proceedToNext" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Restart <span class="opacity-50 ml-1 text-[9px]">(Enter)</span></span></button>
+        <button @click="handleRestartFromPause" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Restart <span class="opacity-50 ml-1 text-[9px]">(Enter)</span></span></button>
         <button @click="router.push('/')" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Quit to Menu</span></button>
       </div>
     </div>
 
-    <!-- MOUNTED DURING BOTH PLAYING AND PAUSED -->
     <TypingBoard 
       v-if="gameState === 'playing' || gameState === 'paused'"
       :isPaused="gameState === 'paused'"
-      :key="currentIndex"
+      :key="boardKey"
       :quote="quotes[currentIndex]" 
       :seasonName="activeSeason.name"
-      :passageNumber="stats.lifetimePassages + 1"
+      :passageNumber="displayPassageNumber"
       gameMode="infinite"
       @passage-complete="handleCompletion"
       @pause="handlePause"
       @resume="handleResume"
     />
 
-    <!-- NEW: @archive listener added here -->
     <CompletionStats 
       v-if="gameState === 'complete'"
       mode="infinite"
-      :statsData="lastStats"
+      :passageText="quotes[currentIndex]?.text || ''"
+      :attempts="attemptsArray"
+      :isAlreadyArchived="isCurrentQuoteArchived"
+      @retry="handleRetryPassage"
       @next="handleNextPassage"
       @menu="router.push('/')"
       @archive="handleArchiveQuote"
