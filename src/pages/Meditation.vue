@@ -6,7 +6,8 @@ import CompletionStats from '../components/CompletionStats.vue'
 import PassageLoader from '../components/PassageLoader.vue'
 import AuthModal from '../components/AuthModal.vue'
 import { fetchPassages } from '../services/api'
-import { stats, settings, currentUser } from '../store'
+import { stats, settings, currentUser, recordSession } from '../store' // <-- Added recordSession
+import { saveQuoteToArchive } from '../services/firebase' // <-- Added Firebase function
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
@@ -92,9 +93,8 @@ const handleCompletion = (results) => {
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  const quoteToArchive = quotes.value[currentIndex.value]
-  const isDuplicate = stats.value.seasonal[currentS].quotes.some(q => q.text === quoteToArchive.text)
-  if (!isDuplicate) stats.value.seasonal[currentS].quotes.unshift(quoteToArchive) 
+  // Notice we removed the automatic array unshift here too
+  recordSession()
   
   gameState.value = 'complete'
 }
@@ -108,6 +108,14 @@ const handleNextPassage = () => {
   if (!checkAuthGuard()) return 
   proceedToNext()
 }
+
+// NEW: Sends the quote to Firebase
+const handleArchiveQuote = async () => {
+  if (!currentUser.value) return
+  const currentQuote = quotes.value[currentIndex.value]
+  if (!currentQuote) return
+  await saveQuoteToArchive(currentUser.value.uid, currentQuote.text, currentQuote.author)
+}
 </script>
 
 <template>
@@ -115,7 +123,7 @@ const handleNextPassage = () => {
     
     <PassageLoader v-if="gameState === 'loading'" text="Unfolding the path..." />
 
-    <!-- PAUSE MENU OVERLAY (TypingBoard remains mounted underneath) -->
+    <!-- PAUSE MENU OVERLAY -->
     <div v-if="gameState === 'paused'" class="fixed inset-0 z-50 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
       <h3 class="text-4xl tracking-[0.3em] uppercase font-light mb-12 font-ui-serif">Paused</h3>
       <div class="flex flex-col gap-6 w-64 items-center">
@@ -139,12 +147,14 @@ const handleNextPassage = () => {
       @resume="handleResume"
     />
 
+    <!-- NEW: @archive listener added here -->
     <CompletionStats 
       v-if="gameState === 'complete'"
       mode="infinite"
       :statsData="lastStats"
       @next="handleNextPassage"
       @menu="router.push('/')"
+      @archive="handleArchiveQuote"
     />
 
     <AuthModal v-if="showAuthModal" @close="handleModalClose" />

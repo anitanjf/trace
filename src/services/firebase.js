@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { getDatabase } from "firebase/database"; 
 
 const firebaseConfig = {
@@ -35,5 +35,24 @@ export const logOut = async () => {
     await signOut(auth);
   } catch (error) {
     console.error("Sign-Out Error:", error);
+  }
+};
+
+// NEW: This function catches the quote and saves it to the user's bookmarks
+export const saveQuoteToArchive = async (userId, quoteText, author) => {
+  if (!userId) return;
+  
+  try {
+    const bookmarksRef = collection(db, "users", userId, "bookmarks");
+    
+    await addDoc(bookmarksRef, {
+      quoteText,
+      author: author || "Unknown",
+      savedAt: serverTimestamp() 
+    });
+    
+    console.log("Passage preserved in archive.");
+  } catch (error) {
+    console.error("Failed to preserve passage:", error);
   }
 };

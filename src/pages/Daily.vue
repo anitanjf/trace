@@ -6,7 +6,8 @@ import CompletionStats from '../components/CompletionStats.vue'
 import PassageLoader from '../components/PassageLoader.vue'
 import AuthModal from '../components/AuthModal.vue'
 import { fetchPassages } from '../services/api'
-import { stats, settings, currentUser } from '../store'
+import { stats, settings, currentUser, recordSession } from '../store' // <-- Added recordSession
+import { saveQuoteToArchive } from '../services/firebase' // <-- Added Firebase function
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
@@ -104,10 +105,16 @@ const handleCompletion = (results) => {
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  const isDuplicate = stats.value.seasonal[currentS].quotes.some(q => q.text === dailyQuote.value.text)
-  if (!isDuplicate) stats.value.seasonal[currentS].quotes.unshift(dailyQuote.value) 
-  
+  // Notice we removed the automatic array unshift here
+  recordSession() 
+
   gameState.value = 'complete'
+}
+
+// NEW: Sends the quote to Firebase
+const handleArchiveQuote = async () => {
+  if (!currentUser.value || !dailyQuote.value) return
+  await saveQuoteToArchive(currentUser.value.uid, dailyQuote.value.text, dailyQuote.value.author)
 }
 </script>
 
@@ -127,7 +134,7 @@ const handleCompletion = (results) => {
       </button>
     </div>
 
-    <!-- PAUSE MENU OVERLAY (TypingBoard remains mounted underneath) -->
+    <!-- PAUSE MENU OVERLAY -->
     <div v-if="gameState === 'paused'" class="fixed inset-0 z-50 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
       <h3 class="text-4xl tracking-[0.3em] uppercase font-light mb-12 font-ui-serif">Paused</h3>
       <div class="flex flex-col gap-6 w-64 items-center">
@@ -150,11 +157,13 @@ const handleCompletion = (results) => {
       @resume="handleResume"
     />
 
+    <!-- NEW: @archive listener added here -->
     <CompletionStats 
       v-if="gameState === 'complete'"
       mode="daily"
       :statsData="lastStats"
       @menu="router.push('/')"
+      @archive="handleArchiveQuote"
     />
 
     <!-- AUTH MODAL GUARD -->
