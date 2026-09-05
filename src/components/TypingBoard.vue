@@ -13,10 +13,11 @@ const props = defineProps({
 const emit = defineEmits(['passage-complete', 'pause', 'resume'])
 
 const userInputs = ref([])
-const mobileInputValue = ref('') // New sync variable for virtual keyboards
+const mobileInputValue = ref('') 
 const typedCount = computed(() => userInputs.value.length)
 const missedLetters = ref({})
 const missedWords = ref(new Set())
+const missedWordIndices = ref(new Set()) // NEW: Tracks exact word indices for Ghost Text
 const activeMistakeMarks = ref({}) 
 const keystrokeSparks = ref([]) 
 const sessionKeystrokes = ref(0)
@@ -43,7 +44,7 @@ const cursorAbsoluteY = ref(-1000)
 watch(() => props.isPaused, (isNowPaused) => {
   if (isNowPaused) {
     pauseStartTime.value = Date.now()
-    if (mobileInputRef.value) mobileInputRef.value.blur() // Dismiss mobile keyboard on pause
+    if (mobileInputRef.value) mobileInputRef.value.blur() 
   } else {
     if (pauseStartTime.value > 0) {
       sessionStartTime.value += (Date.now() - pauseStartTime.value)
@@ -52,7 +53,6 @@ watch(() => props.isPaused, (isNowPaused) => {
   }
 })
 
-// Keep virtual keyboard in perfect sync with our state
 watch(userInputs, (newVal) => {
   mobileInputValue.value = newVal.join('')
 }, { deep: true })
@@ -143,7 +143,6 @@ const updateCursor = async () => {
 
 watch(typedCount, updateCursor)
 
-// CORE LOGIC ABSTRACTION
 const processCharacter = (char) => {
   isTypingActive.value = true
   clearTimeout(typingTimeout)
@@ -168,6 +167,12 @@ const processCharacter = (char) => {
     if (!activeMistakeMarks.value[currentIndex]) {
       activeMistakeMarks.value[currentIndex] = { rotate: Math.random() * 360, scale: Math.random() * 0.4 + 0.8 }
     }
+    
+    // NEW: Calculate the exact word index by counting spaces up to this point
+    const textUpToCurrent = processedQuoteText.value.slice(0, currentIndex + 1)
+    const wordIndex = textUpToCurrent.split(' ').length - 1
+    missedWordIndices.value.add(wordIndex)
+
     const charToTrack = expectedChar.toLowerCase()
     if (charToTrack !== ' ' && charToTrack.match(/[a-z0-9]/i)) missedLetters.value[charToTrack] = (missedLetters.value[charToTrack] || 0) + 1
     const currentWord = getWordAtIndex(processedQuoteText.value, currentIndex)
@@ -203,7 +208,6 @@ const processBackspace = (isCtrl) => {
   updateCursor()
 }
 
-// DESKTOP EVENT HANDLER
 const handleKey = (e) => {
   if (e.key === 'Escape') { 
     if (props.isPaused) emit('resume')
@@ -212,10 +216,7 @@ const handleKey = (e) => {
   }
 
   if (props.isPaused || isEntering.value || isTransitioning.value || isKintsugi.value) return 
-  
-  // Ignore virtual mobile keyboard signals so they don't double-fire
   if (e.keyCode === 229) return 
-
   if (e.code === 'Space') e.preventDefault()
   
   if (e.key === 'Backspace') {
@@ -224,12 +225,11 @@ const handleKey = (e) => {
   }
 
   if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-    e.preventDefault() // Prevents hidden input from double-catching desktop typing
+    e.preventDefault() 
     processCharacter(e.key)
   }
 }
 
-// MOBILE EVENT HANDLER
 const handleMobileInput = (e) => {
   if (props.isPaused || isEntering.value || isTransitioning.value || isKintsugi.value) {
     mobileInputValue.value = userInputs.value.join('')
@@ -257,8 +257,15 @@ const triggerCompletion = () => {
       const wpm = Math.round((processedQuoteText.value.length / 5) / timeInMinutes)
       const accuracy = Math.max(0, Math.round(((sessionKeystrokes.value - sessionMistakes.value) / sessionKeystrokes.value) * 100))
       
+      // NEW: Emits missedIndices to power the Ghost Text
       emit('passage-complete', {
-        wpm, accuracy, keystrokes: sessionKeystrokes.value, mistakes: sessionMistakes.value, missedLetters: missedLetters.value, missedWords: missedWords.value
+        wpm, 
+        accuracy, 
+        keystrokes: sessionKeystrokes.value, 
+        mistakes: sessionMistakes.value, 
+        missedLetters: missedLetters.value, 
+        missedWords: missedWords.value,
+        missedIndices: Array.from(missedWordIndices.value) 
       })
     }, sweepDuration)
   }, 3500)
@@ -302,7 +309,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- INVISIBLE MOBILE VIRTUAL KEYBOARD TRIGGER LAYER -->
       <input 
         ref="mobileInputRef"
         type="text" 
@@ -325,7 +331,6 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <!-- RESPONSIVE TYPOGRAPHY (Scales down for mobile) -->
       <div class="text-xl sm:text-2xl md:text-3xl leading-relaxed sm:leading-loose text-center mb-8 max-w-4xl relative z-10" :class="fontClass">
         <span v-for="(word, wIdx) in poemWords" :key="'w-'+wIdx" :class="{'inline-block whitespace-nowrap': !word[0].isSpace}">
           <template v-for="c in word" :key="c.index">

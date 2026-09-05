@@ -9,7 +9,8 @@ const getDefaultStats = () => ({
   lifetimeDaily: 0,
   lifetimeKeystrokes: 0,
   lifetimeMistakes: 0,
-  activityGrid: {}, // Tracks daily consistency for the Heatmap
+  activityGrid: {}, 
+  passageHistory: {}, // NEW: Tracks all attempts for specific passages for the Profile view
   seasonal: {
     0: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
     1: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
@@ -35,13 +36,11 @@ export const settings = ref(getDefaultSettings())
 export const timeOfDay = ref('day')
 export const currentUser = ref(null)
 
-// Global loading state to hide the app until Firebase is done
 export const isAppReady = ref(false) 
 
 const syncToCloud = async (uid, currentStats, currentSettings) => {
   try {
     const userRef = doc(db, 'users', uid)
-    // merge: true ensures the 'profile' object from Profile.vue is NEVER overwritten
     await setDoc(userRef, {
       stats: currentStats,
       settings: currentSettings,
@@ -52,27 +51,25 @@ const syncToCloud = async (uid, currentStats, currentSettings) => {
   }
 }
 
-// UPGRADED: Uses local device time instead of UTC to prevent rollover bugs
 export const recordSession = () => {
   const today = new Date()
   const localDateString = today.getFullYear() + '-' + 
                           String(today.getMonth() + 1).padStart(2, '0') + '-' + 
                           String(today.getDate()).padStart(2, '0')
   
-  if (!stats.value.activityGrid) {
-    stats.value.activityGrid = {}
-  }
-  
-  if (!stats.value.activityGrid[localDateString]) {
-    stats.value.activityGrid[localDateString] = 0
-  }
+  if (!stats.value.activityGrid) stats.value.activityGrid = {}
+  if (!stats.value.activityGrid[localDateString]) stats.value.activityGrid[localDateString] = 0
   
   stats.value.activityGrid[localDateString] += 1
-  // The watch(stats) function below automatically syncs this to Firebase
+}
+
+// NEW: Saves the array of attempts to Firebase when user finally clicks "Proceed to Next"
+export const savePassageHistory = (passageId, attemptsArray) => {
+  if (!stats.value.passageHistory) stats.value.passageHistory = {}
+  stats.value.passageHistory[passageId] = attemptsArray
 }
 
 export const initStore = () => {
-  // 1. Record the exact millisecond the app begins loading
   const appStartTime = Date.now() 
 
   timeOfDay.value = calculateTimeOfDay()
@@ -84,6 +81,7 @@ export const initStore = () => {
     const parsed = JSON.parse(savedStats)
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
     if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
+    if (parsed.passageHistory === undefined) parsed.passageHistory = {} 
     if (!parsed.seasonal[4]) {
       parsed.seasonal[4] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
       parsed.seasonal[5] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
@@ -110,16 +108,12 @@ export const initStore = () => {
 
   watch(stats, (newStats) => {
     localStorage.setItem('zen_stats', JSON.stringify(newStats))
-    if (currentUser.value) {
-      syncToCloud(currentUser.value.uid, newStats, settings.value)
-    }
+    if (currentUser.value) syncToCloud(currentUser.value.uid, newStats, settings.value)
   }, { deep: true })
 
   watch(settings, (newSettings) => {
     localStorage.setItem('zen_settings', JSON.stringify(newSettings))
-    if (currentUser.value) {
-      syncToCloud(currentUser.value.uid, stats.value, newSettings)
-    }
+    if (currentUser.value) syncToCloud(currentUser.value.uid, stats.value, newSettings)
   }, { deep: true })
 
   onAuthStateChanged(auth, async (user) => {
@@ -135,11 +129,11 @@ export const initStore = () => {
           const cloudData = docSnap.data()
           if (cloudData.stats) {
             if (!cloudData.stats.activityGrid) cloudData.stats.activityGrid = {}
+            if (!cloudData.stats.passageHistory) cloudData.stats.passageHistory = {}
             stats.value = cloudData.stats
           }
           if (cloudData.settings) {
             settings.value = cloudData.settings
-            
             if (settings.value.themeMode === 'realtime') {
               settings.value.darkMode = false;
               settings.value.timeAtmosphere = true;
@@ -160,15 +154,8 @@ export const initStore = () => {
       localStorage.removeItem('zen_settings')
     }
 
-    // 2. Calculate how long Firebase took to load
     const elapsed = Date.now() - appStartTime
-    
-    // 3. Subtract elapsed time from 3000ms (3 seconds) to find the remaining delay needed
     const remainingDelay = Math.max(3000 - elapsed, 0)
-
-    // 4. Reveal the app only after the minimum 3 seconds has passed
-    setTimeout(() => {
-      isAppReady.value = true
-    }, remainingDelay)
+    setTimeout(() => { isAppReady.value = true }, remainingDelay)
   })
 }
