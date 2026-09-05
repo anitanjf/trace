@@ -9,6 +9,7 @@ const getDefaultStats = () => ({
   lifetimeDaily: 0,
   lifetimeKeystrokes: 0,
   lifetimeMistakes: 0,
+  activityGrid: {}, // Tracks daily consistency for the Heatmap
   seasonal: {
     0: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
     1: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
@@ -40,6 +41,7 @@ export const isAppReady = ref(false)
 const syncToCloud = async (uid, currentStats, currentSettings) => {
   try {
     const userRef = doc(db, 'users', uid)
+    // merge: true ensures the 'profile' object from Profile.vue is NEVER overwritten
     await setDoc(userRef, {
       stats: currentStats,
       settings: currentSettings,
@@ -48,6 +50,25 @@ const syncToCloud = async (uid, currentStats, currentSettings) => {
   } catch (error) {
     console.error("Failed to sync to cloud:", error)
   }
+}
+
+// UPGRADED: Uses local device time instead of UTC to prevent rollover bugs
+export const recordSession = () => {
+  const today = new Date()
+  const localDateString = today.getFullYear() + '-' + 
+                          String(today.getMonth() + 1).padStart(2, '0') + '-' + 
+                          String(today.getDate()).padStart(2, '0')
+  
+  if (!stats.value.activityGrid) {
+    stats.value.activityGrid = {}
+  }
+  
+  if (!stats.value.activityGrid[localDateString]) {
+    stats.value.activityGrid[localDateString] = 0
+  }
+  
+  stats.value.activityGrid[localDateString] += 1
+  // The watch(stats) function below automatically syncs this to Firebase
 }
 
 export const initStore = () => {
@@ -62,6 +83,7 @@ export const initStore = () => {
   if (savedStats) {
     const parsed = JSON.parse(savedStats)
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
+    if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
     if (!parsed.seasonal[4]) {
       parsed.seasonal[4] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
       parsed.seasonal[5] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
@@ -111,7 +133,10 @@ export const initStore = () => {
         
         if (docSnap.exists()) {
           const cloudData = docSnap.data()
-          if (cloudData.stats) stats.value = cloudData.stats
+          if (cloudData.stats) {
+            if (!cloudData.stats.activityGrid) cloudData.stats.activityGrid = {}
+            stats.value = cloudData.stats
+          }
           if (cloudData.settings) {
             settings.value = cloudData.settings
             

@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { settings } from '../store'
 
 const props = defineProps({
@@ -7,7 +7,14 @@ const props = defineProps({
   statsData: { type: Object, required: true }
 })
 
-const emit = defineEmits(['next', 'menu'])
+const emit = defineEmits(['next', 'menu', 'archive'])
+
+const isArchived = ref(false)
+
+const handleArchive = () => {
+  isArchived.value = true
+  emit('archive')
+}
 
 const topMissedLetters = computed(() => {
   if (!props.statsData || !props.statsData.missedLetters) return []
@@ -68,6 +75,25 @@ const missedWordsArray = computed(() => {
     </div>
     
     <div v-else class="mb-12 sm:mb-16 flex flex-col items-center text-center px-4"><span class="text-xs sm:text-sm italic opacity-80 font-ui-serif" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">A flawless journey. The mind was perfectly still.</span></div>
+
+    <!-- NEW: Preserve in Archive Button -->
+    <button 
+      @click="handleArchive" 
+      :disabled="isArchived"
+      class="relative px-8 py-3 mb-6 group transition-all duration-500 flex justify-center items-center"
+      :class="isArchived ? 'scale-95 cursor-default' : 'hover:scale-105'"
+    >
+      <div class="absolute inset-0 rounded-full transition-opacity" 
+           :class="[
+             settings.darkMode ? 'bg-[#DFBE73]' : 'bg-[#DFBE73]', 
+             isArchived ? 'opacity-30' : 'opacity-10 group-hover:opacity-25'
+           ]" 
+           style="filter: url(#ink-blot);"></div>
+      <span class="relative z-10 tracking-[0.25em] uppercase text-xs transition-colors" 
+            :class="isArchived ? 'text-[#DFBE73]' : (settings.darkMode ? 'text-stone-300' : 'text-stone-900')">
+        {{ isArchived ? 'Preserved' : 'Preserve in Archive' }}
+      </span>
+    </button>
 
     <button v-if="props.mode === 'daily'" @click="emit('menu')" class="relative px-8 py-3 group transition-transform hover:scale-105">
       <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
