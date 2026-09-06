@@ -31,10 +31,18 @@ const lifetimeAccuracy = computed(() => {
         <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
         <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Begin Meditation</span>
       </button>
+      
       <button @click="router.push('/daily')" class="relative w-full py-3.5 px-6 group transition-transform hover:scale-[1.02] flex items-center justify-center">
         <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
         <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</span>
       </button>
+
+      <!-- NEW: Flow State Button -->
+      <button @click="router.push('/flow')" class="relative w-full py-3.5 px-6 group transition-transform hover:scale-[1.02] flex items-center justify-center">
+        <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
+        <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</span>
+      </button>
+
       <button @click="showMultiplayerModal = true" class="relative w-full py-3.5 px-6 group transition-transform hover:scale-[1.02] flex items-center justify-center">
         <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
         <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium flex items-center gap-2" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-800'">Multiplayer <span class="text-[9px] px-2 py-0.5 rounded-full tracking-normal opacity-70 border font-ui-sans" :class="settings?.darkMode ? 'border-stone-700 bg-stone-900' : 'border-stone-300 bg-white/60'">soon ✦</span></span>

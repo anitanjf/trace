@@ -5,7 +5,8 @@ import Daily from '../pages/Daily.vue'
 import Archive from '../pages/Archive.vue'
 import Settings from '../pages/Settings.vue'
 import About from '../pages/About.vue'
-import Profile from '../pages/Profile.vue' // Import Profile
+import Profile from '../pages/Profile.vue'
+import Flow from '../pages/Flow.vue'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
@@ -14,7 +15,8 @@ const routes = [
   { path: '/archive', name: 'Archive', component: Archive },
   { path: '/settings', name: 'Settings', component: Settings },
   { path: '/about', name: 'About', component: About },
-  { path: '/profile', name: 'Profile', component: Profile } // Map Profile Route
+  { path: '/profile', name: 'Profile', component: Profile },
+  { path: '/flow', component: Flow }
 ]
 
 const router = createRouter({

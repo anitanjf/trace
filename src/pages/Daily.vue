@@ -6,16 +6,20 @@ import CompletionStats from '../components/CompletionStats.vue'
 import PassageLoader from '../components/PassageLoader.vue'
 import AuthModal from '../components/AuthModal.vue'
 import { fetchPassages } from '../services/api'
-import { stats, settings, currentUser, recordSession } from '../store' // <-- Added recordSession
-import { saveQuoteToArchive } from '../services/firebase' // <-- Added Firebase function
+import { stats, settings, currentUser, recordSession, checkEnlightenments } from '../store' 
+import { saveQuoteToArchive } from '../services/firebase' 
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
 const router = useRouter()
 const dailyQuote = ref(null)
 const gameState = ref('loading') 
-const lastStats = ref(null)
 const showAuthModal = ref(false)
+
+const attemptsArray = ref([])
+const boardKey = ref(0)
+const isFirstCompletionOfDay = ref(true)
+const isCurrentQuoteArchived = ref(false)
 
 const activeVisualIndex = computed(() => settings.value.themeMode === 'locked' ? (settings.value.lockedSeason || 0) : getRealWorldSeason())
 const activeSeason = computed(() => seasons[activeVisualIndex.value] || seasons[0])
@@ -43,16 +47,23 @@ const initGame = async () => {
     const passages = await fetchPassages()
     const startIndex = todaySeed % (passages.length - 1)
     dailyQuote.value = passages[startIndex]
+    isFirstCompletionOfDay.value = true
+    isCurrentQuoteArchived.value = false
     setTimeout(() => { gameState.value = 'playing' }, 1500)
   } catch (error) {
     console.error("Failed to load daily passage", error)
   }
 }
 
+const handleRestartFromPause = () => {
+  gameState.value = 'playing'
+  boardKey.value++ 
+}
+
 const handleGlobalKey = (e) => {
   if (gameState.value === 'paused') {
     if (e.key === 'Enter') {
-      handleRestart()
+      handleRestartFromPause()
     }
   }
 }
@@ -83,38 +94,44 @@ const handleModalClose = () => {
 const handlePause = () => { gameState.value = 'paused' }
 const handleResume = () => { gameState.value = 'playing' }
 
-const handleRestart = () => {
-  gameState.value = 'playing'
-  const current = dailyQuote.value
-  dailyQuote.value = null
-  setTimeout(() => { dailyQuote.value = current }, 10)
-}
-
 const handleCompletion = (results) => {
-  lastStats.value = results
+  attemptsArray.value.push(results)
   const currentS = activeVisualIndex.value
   
-  stats.value.lifetimeDaily++ 
+  if (isFirstCompletionOfDay.value) {
+    stats.value.lifetimeDaily++ 
+    stats.value.lastDailyDate = Math.floor(Date.now() / 86400000)
+    
+    if (!stats.value.seasonal[currentS]) stats.value.seasonal[currentS] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
+    stats.value.seasonal[currentS].passages++ 
+    
+    isFirstCompletionOfDay.value = false
+  }
+
   stats.value.lifetimeKeystrokes += results.keystrokes
   stats.value.lifetimeMistakes += results.mistakes
-  
-  stats.value.lastDailyDate = Math.floor(Date.now() / 86400000)
-  
-  if (!stats.value.seasonal[currentS]) stats.value.seasonal[currentS] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
-  stats.value.seasonal[currentS].passages++ 
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  // Notice we removed the automatic array unshift here
   recordSession() 
-
+  checkEnlightenments(results) 
   gameState.value = 'complete'
 }
 
-// NEW: Sends the quote to Firebase
+const handleRetryPassage = () => {
+  gameState.value = 'playing'
+  boardKey.value++ 
+}
+
 const handleArchiveQuote = async () => {
   if (!currentUser.value || !dailyQuote.value) return
   await saveQuoteToArchive(currentUser.value.uid, dailyQuote.value.text, dailyQuote.value.author)
+  isCurrentQuoteArchived.value = true 
+}
+
+const handleReturnToMenu = () => {
+  attemptsArray.value = []
+  router.push('/')
 }
 </script>
 
@@ -123,7 +140,6 @@ const handleArchiveQuote = async () => {
     
     <PassageLoader v-if="gameState === 'loading' && !showAuthModal" text="Preparing the tea..." />
 
-    <!-- ALREADY COMPLETED STATE -->
     <div v-if="gameState === 'already-completed'" class="flex flex-col items-center justify-center animate-fade-in z-20 text-center max-w-md px-6">
       <h3 class="text-3xl tracking-[0.3em] uppercase font-light mb-8 font-ui-serif" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">Mind Full</h3>
       <p class="text-xl italic font-light leading-relaxed mb-8 font-ui-serif" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-500'">"A cup can only hold so much tea before it overflows."</p>
@@ -134,20 +150,19 @@ const handleArchiveQuote = async () => {
       </button>
     </div>
 
-    <!-- PAUSE MENU OVERLAY -->
     <div v-if="gameState === 'paused'" class="fixed inset-0 z-50 backdrop-blur-sm flex flex-col items-center justify-center animate-fade-in font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
       <h3 class="text-4xl tracking-[0.3em] uppercase font-light mb-12 font-ui-serif">Paused</h3>
       <div class="flex flex-col gap-6 w-64 items-center">
         <button @click="handleResume" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Resume <span class="opacity-50 ml-1 text-[9px]">(ESC)</span></span></button>
-        <button @click="handleRestart" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Restart <span class="opacity-50 ml-1 text-[9px]">(Enter)</span></span></button>
+        <button @click="handleRestartFromPause" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Restart <span class="opacity-50 ml-1 text-[9px]">(Enter)</span></span></button>
         <button @click="router.push('/')" class="relative px-8 py-3 w-full group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs">Quit to Menu</span></button>
       </div>
     </div>
 
-    <!-- MOUNTED DURING BOTH PLAYING AND PAUSED -->
     <TypingBoard 
       v-if="(gameState === 'playing' || gameState === 'paused') && dailyQuote"
       :isPaused="gameState === 'paused'"
+      :key="boardKey"
       :quote="dailyQuote" 
       :seasonName="activeSeason.name"
       :passageNumber="stats.lifetimeDaily + 1" 
@@ -157,16 +172,17 @@ const handleArchiveQuote = async () => {
       @resume="handleResume"
     />
 
-    <!-- NEW: @archive listener added here -->
     <CompletionStats 
       v-if="gameState === 'complete'"
       mode="daily"
-      :statsData="lastStats"
-      @menu="router.push('/')"
+      :passageText="dailyQuote?.text || ''"
+      :attempts="attemptsArray"
+      :isAlreadyArchived="isCurrentQuoteArchived"
+      @retry="handleRetryPassage"
+      @menu="handleReturnToMenu"
       @archive="handleArchiveQuote"
     />
 
-    <!-- AUTH MODAL GUARD -->
     <AuthModal v-if="showAuthModal" @close="handleModalClose" />
 
   </div>
