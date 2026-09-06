@@ -6,7 +6,7 @@ import CompletionStats from '../components/CompletionStats.vue'
 import PassageLoader from '../components/PassageLoader.vue'
 import AuthModal from '../components/AuthModal.vue'
 import { fetchPassages } from '../services/api'
-import { stats, settings, currentUser, recordSession, savePassageHistory } from '../store'
+import { stats, settings, currentUser, recordSession, savePassageHistory, checkEnlightenments } from '../store'
 import { saveQuoteToArchive } from '../services/firebase'
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
@@ -21,7 +21,7 @@ const attemptsArray = ref([])
 const boardKey = ref(0)
 const displayPassageNumber = ref(1) 
 const isFirstCompletionOfPassage = ref(true) 
-const isCurrentQuoteArchived = ref(false) // NEW: Remembers archive state across retries
+const isCurrentQuoteArchived = ref(false) 
 
 const activeVisualIndex = computed(() => settings.value.themeMode === 'locked' ? (settings.value.lockedSeason || 0) : getRealWorldSeason())
 const activeSeason = computed(() => seasons[activeVisualIndex.value] || seasons[0])
@@ -41,7 +41,6 @@ const initGame = async () => {
   try {
     quotes.value = await fetchPassages()
     
-    // NEW: Pull the current index based on the SPECIFIC season's passage count, not the lifetime count
     const seasonalPassageCount = stats.value.seasonal[activeVisualIndex.value]?.passages || 0
     currentIndex.value = seasonalPassageCount % quotes.value.length
     displayPassageNumber.value = seasonalPassageCount + 1
@@ -107,6 +106,7 @@ const handleCompletion = (results) => {
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
   recordSession()
+  checkEnlightenments(results) 
   gameState.value = 'complete'
 }
 
@@ -117,14 +117,13 @@ const handleRetryPassage = () => {
 
 const proceedToNext = () => {
   if (attemptsArray.value.length > 0) {
-    // NEW: Save with a season-specific ID so the Profile can group them!
     const passageId = `season_${activeVisualIndex.value}_passage_${displayPassageNumber.value}`
     savePassageHistory(passageId, [...attemptsArray.value])
   }
 
   attemptsArray.value = []
   isFirstCompletionOfPassage.value = true
-  isCurrentQuoteArchived.value = false // Reset archive state for the new quote
+  isCurrentQuoteArchived.value = false 
   displayPassageNumber.value++ 
 
   currentIndex.value = (currentIndex.value + 1) % quotes.value.length
@@ -142,7 +141,7 @@ const handleArchiveQuote = async () => {
   const currentQuote = quotes.value[currentIndex.value]
   if (!currentQuote) return
   await saveQuoteToArchive(currentUser.value.uid, currentQuote.text, currentQuote.author)
-  isCurrentQuoteArchived.value = true // Mark as archived so the button disables across retries
+  isCurrentQuoteArchived.value = true 
 }
 </script>
 

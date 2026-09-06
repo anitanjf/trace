@@ -15,8 +15,9 @@ const activeTab = ref(getRealWorldSeason())
 const expandedPassageId = ref(null)
 const searchQuery = ref('') 
 
-// Hover state for the Radar Chart Tooltip
+// Hover states
 const hoveredMetric = ref(null)
+const hoveredAchievement = ref(null) // NEW: State for Enlightenment tooltips
 
 const metricDefinitions = {
   Speed: "The flowing current: Your average pace (WPM) across all passages.",
@@ -25,6 +26,14 @@ const metricDefinitions = {
   Focus: "The unwavering mind: Ratio of completed passages to total retry attempts.",
   Resilience: "The rising tide: Frequency of your final attempt surpassing your first.",
   Stamina: "The endless journey: Your endurance, measured by total reflections made."
+}
+
+// NEW: Enlightenment Definitions
+const achievementDefs = {
+  firstStep: { name: "The First Step", desc: "You have begun your journey. (Complete 1 passage)" },
+  stillWater: { name: "Still Water", desc: "Perfect clarity. (Achieve 100% accuracy)" },
+  endlessJourney: { name: "Endless Journey", desc: "A testament to dedication. (Complete 50 passages)" },
+  midnightLotus: { name: "Midnight Lotus", desc: "Finding peace in the quiet hours. (Meditate between 12 AM - 4 AM)" }
 }
 
 const isEditing = ref(false)
@@ -120,7 +129,6 @@ const getSeasonAverages = computed(() => {
   }
 })
 
-// DYNAMIC MATH: Translates typing stats into 6 axes for the Radar Chart
 const radarData = computed(() => {
   const history = seasonalPassageHistory.value
   const passagesCount = history.length
@@ -277,7 +285,7 @@ const radarData = computed(() => {
             <!-- LAYOUT: 1/3 Chart, 2/3 Search & Stats -->
             <div class="flex flex-col lg:flex-row w-full gap-16 lg:gap-12 items-start mt-2">
               
-              <!-- LEFT (1/3): RADAR CHART WITH HOVER LABELS -->
+              <!-- LEFT (1/3): RADAR CHART -->
               <div class="w-full lg:w-1/3 flex flex-col items-center pt-2 relative">
                  <span class="text-[8px] sm:text-[9px] uppercase tracking-[0.4em] opacity-40 font-semibold mb-8 text-center">Path to Mastery</span>
                  
@@ -300,29 +308,12 @@ const radarData = computed(() => {
                     </svg>
 
                     <!-- Interactive Labels -->
-                    <span @mouseenter="hoveredMetric = 'Speed'" @mouseleave="hoveredMetric = null" 
-                          class="absolute -top-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Speed' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Speed</span>
-                    
-                    <span @mouseenter="hoveredMetric = 'Clarity'" @mouseleave="hoveredMetric = null" 
-                          class="absolute top-[18%] -right-8 sm:-right-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Clarity' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Clarity</span>
-                    
-                    <span @mouseenter="hoveredMetric = 'Consistency'" @mouseleave="hoveredMetric = null" 
-                          class="absolute bottom-[18%] -right-10 sm:-right-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Consistency' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Consistency</span>
-                    
-                    <span @mouseenter="hoveredMetric = 'Focus'" @mouseleave="hoveredMetric = null" 
-                          class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Focus' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Focus</span>
-                    
-                    <span @mouseenter="hoveredMetric = 'Resilience'" @mouseleave="hoveredMetric = null" 
-                          class="absolute bottom-[18%] -left-10 sm:-left-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Resilience' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Resilience</span>
-                    
-                    <span @mouseenter="hoveredMetric = 'Stamina'" @mouseleave="hoveredMetric = null" 
-                          class="absolute top-[18%] -left-8 sm:-left-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1"
-                          :class="hoveredMetric === 'Stamina' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Stamina</span>
+                    <span @mouseenter="hoveredMetric = 'Speed'" @mouseleave="hoveredMetric = null" class="absolute -top-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Speed' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Speed</span>
+                    <span @mouseenter="hoveredMetric = 'Clarity'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -right-8 sm:-right-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Clarity' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Clarity</span>
+                    <span @mouseenter="hoveredMetric = 'Consistency'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -right-10 sm:-right-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Consistency' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Consistency</span>
+                    <span @mouseenter="hoveredMetric = 'Focus'" @mouseleave="hoveredMetric = null" class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Focus' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Focus</span>
+                    <span @mouseenter="hoveredMetric = 'Resilience'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -left-10 sm:-left-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Resilience' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Resilience</span>
+                    <span @mouseenter="hoveredMetric = 'Stamina'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -left-8 sm:-left-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Stamina' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Stamina</span>
                  </div>
 
                  <!-- Dynamic Tooltip Display -->
@@ -399,7 +390,7 @@ const radarData = computed(() => {
                            </div>
                          </button>
                          
-                         <!-- Expanded Retries View (Clean, borderless, smaller text) -->
+                         <!-- Expanded Retries View -->
                          <div v-if="expandedPassageId === passage.id" class="w-full pb-6 pt-2 px-4 sm:px-6 animate-fade-in">
                            <div class="pl-2 sm:pl-4 flex flex-col gap-3">
                              
@@ -436,17 +427,57 @@ const radarData = computed(() => {
           </div>
         </div>
 
-        <!-- ACTIONS & ACHIEVEMENTS -->
+        <!-- NEW: ACTIONS & ENLIGHTENMENTS -->
         <template v-if="!isEditing">
           <div class="order-3 flex flex-col items-center w-full animate-fade-in md:col-start-1 md:row-start-2 pt-8 border-t md:border-t-0" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'">
+            
             <div class="flex flex-col items-center mb-10 w-full max-w-[260px] md:max-w-[200px] border-b pb-10" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'">
-              <h3 class="text-[9px] uppercase tracking-[0.3em] mb-6 opacity-70 font-semibold" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Achievements</h3>
-              <div class="flex gap-4">
-                 <div class="w-10 h-10 rounded-full opacity-50 border border-dashed flex items-center justify-center text-[8px] uppercase tracking-widest" :class="settings.darkMode ? 'border-stone-400 text-stone-300' : 'border-stone-500 text-stone-700'">?</div>
-                 <div class="w-10 h-10 rounded-full opacity-50 border border-dashed flex items-center justify-center text-[8px] uppercase tracking-widest" :class="settings.darkMode ? 'border-stone-400 text-stone-300' : 'border-stone-500 text-stone-700'">?</div>
+              <h3 class="text-[9px] uppercase tracking-[0.3em] mb-8 opacity-70 font-semibold" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Enlightenments</h3>
+              
+              <!-- Achievement Grid -->
+              <div class="grid grid-cols-2 gap-4 relative">
+                 <!-- 1. The First Step (Enso Circle) -->
+                 <div @mouseenter="hoveredAchievement = 'firstStep'" @mouseleave="hoveredAchievement = null" 
+                      class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
+                      :class="stats.achievements?.firstStep?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10" stroke-linecap="round"/></svg>
+                 </div>
+
+                 <!-- 2. Still Water (Ripples) -->
+                 <div @mouseenter="hoveredAchievement = 'stillWater'" @mouseleave="hoveredAchievement = null" 
+                      class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
+                      :class="stats.achievements?.stillWater?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="11"/></svg>
+                 </div>
+
+                 <!-- 3. Endless Journey (Infinity Path) -->
+                 <div @mouseenter="hoveredAchievement = 'endlessJourney'" @mouseleave="hoveredAchievement = null" 
+                      class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
+                      :class="stats.achievements?.endlessJourney?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M8 8C4.686 8 2 10.686 2 14s2.686 6 6 6c2.5 0 4.5-1.5 5.5-3.5L16 10c1-2 3-3.5 5.5-3.5 3.314 0 6 2.686 6 6s-2.686 6-6 6" /></svg>
+                 </div>
+
+                 <!-- 4. Midnight Lotus (Moon) -->
+                 <div @mouseenter="hoveredAchievement = 'midnightLotus'" @mouseleave="hoveredAchievement = null" 
+                      class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
+                      :class="stats.achievements?.midnightLotus?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/><path d="M12 18v4"/><path d="M8 20l4-2 4 2"/></svg>
+                 </div>
+              </div>
+              
+              <!-- Dynamic Achievement Tooltip -->
+              <div class="h-12 mt-6 flex flex-col items-center justify-center text-center w-full transition-all duration-500" 
+                   :class="hoveredAchievement ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'">
+                <p class="text-[9px] uppercase tracking-widest font-semibold mb-1" :class="settings.darkMode ? 'text-[#DFBE73]' : 'text-[#cfa444]'">
+                  {{ hoveredAchievement ? achievementDefs[hoveredAchievement].name : '' }}
+                </p>
+                <p class="text-[7px] tracking-widest opacity-60 font-ui-sans" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-600'">
+                  {{ hoveredAchievement ? achievementDefs[hoveredAchievement].desc : '' }}
+                </p>
               </div>
             </div>
 
+            <!-- MENU ACTIONS -->
             <div class="flex flex-col gap-4 w-full items-center max-w-[260px] md:max-w-[200px]">
               <button @click="handleLogout" class="relative px-6 py-3 md:py-2.5 w-full group transition-transform hover:scale-105">
                 <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-red-500 opacity-5 group-hover:opacity-15' : 'bg-red-500 opacity-5 group-hover:opacity-10'" style="filter: url(#ink-blot);"></div>

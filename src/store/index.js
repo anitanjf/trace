@@ -10,7 +10,14 @@ const getDefaultStats = () => ({
   lifetimeKeystrokes: 0,
   lifetimeMistakes: 0,
   activityGrid: {}, 
-  passageHistory: {}, // NEW: Tracks all attempts for specific passages for the Profile view
+  passageHistory: {}, 
+  // NEW: Silent Enlightenment System Tracker
+  achievements: {
+    firstStep: { unlocked: false, timestamp: null },
+    stillWater: { unlocked: false, timestamp: null },
+    endlessJourney: { unlocked: false, timestamp: null },
+    midnightLotus: { unlocked: false, timestamp: null }
+  },
   seasonal: {
     0: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
     1: { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] },
@@ -63,10 +70,39 @@ export const recordSession = () => {
   stats.value.activityGrid[localDateString] += 1
 }
 
-// NEW: Saves the array of attempts to Firebase when user finally clicks "Proceed to Next"
 export const savePassageHistory = (passageId, attemptsArray) => {
   if (!stats.value.passageHistory) stats.value.passageHistory = {}
   stats.value.passageHistory[passageId] = attemptsArray
+}
+
+// NEW: Evaluates achievements silently at the end of a passage
+export const checkEnlightenments = (results) => {
+  if (!stats.value.achievements) {
+    stats.value.achievements = getDefaultStats().achievements
+  }
+
+  const ach = stats.value.achievements;
+  
+  // 1. The First Step (Complete any passage)
+  if (!ach.firstStep.unlocked) {
+    ach.firstStep = { unlocked: true, timestamp: Date.now() };
+  }
+  
+  // 2. Still Water (100% Accuracy)
+  if (!ach.stillWater.unlocked && results.accuracy === 100) {
+    ach.stillWater = { unlocked: true, timestamp: Date.now() };
+  }
+  
+  // 3. Endless Journey (50 lifetime passages)
+  if (!ach.endlessJourney.unlocked && stats.value.lifetimePassages >= 50) {
+    ach.endlessJourney = { unlocked: true, timestamp: Date.now() };
+  }
+  
+  // 4. Midnight Lotus (Meditate between 12:00 AM and 4:00 AM)
+  const currentHour = new Date().getHours();
+  if (!ach.midnightLotus.unlocked && currentHour >= 0 && currentHour < 4) {
+    ach.midnightLotus = { unlocked: true, timestamp: Date.now() };
+  }
 }
 
 export const initStore = () => {
@@ -82,6 +118,7 @@ export const initStore = () => {
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
     if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
     if (parsed.passageHistory === undefined) parsed.passageHistory = {} 
+    if (parsed.achievements === undefined) parsed.achievements = getDefaultStats().achievements // Backwards compatibility hook
     if (!parsed.seasonal[4]) {
       parsed.seasonal[4] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
       parsed.seasonal[5] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
@@ -130,6 +167,7 @@ export const initStore = () => {
           if (cloudData.stats) {
             if (!cloudData.stats.activityGrid) cloudData.stats.activityGrid = {}
             if (!cloudData.stats.passageHistory) cloudData.stats.passageHistory = {}
+            if (!cloudData.stats.achievements) cloudData.stats.achievements = getDefaultStats().achievements
             stats.value = cloudData.stats
           }
           if (cloudData.settings) {
