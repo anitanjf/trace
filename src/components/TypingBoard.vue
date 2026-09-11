@@ -14,7 +14,8 @@ const props = defineProps({
 const emit = defineEmits(['passage-complete', 'pause', 'resume'])
 
 const userInputs = ref([])
-const mobileInputValue = ref('') 
+const mobileInputValue = ref('')
+const isComposing = ref(false)
 const typedCount = computed(() => userInputs.value.length)
 const missedLetters = ref({})
 const missedWords = ref(new Set())
@@ -73,7 +74,7 @@ watch(userInputs, (newVal) => {
 const processedQuoteText = computed(() => {
   let text = props.quote.text
   if (settings.value.pureZen || props.gameMode === 'flow') {
-    text = text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim()
+    text = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim()
   }
   return text
 })
@@ -290,7 +291,7 @@ const handleKey = (e) => {
   }
 
   if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return 
-  if (e.keyCode === 229) return 
+  if (e.keyCode === 229 || e.isComposing) return 
   if (e.code === 'Space') e.preventDefault()
   
   if (e.key === 'Backspace') {
@@ -304,19 +305,71 @@ const handleKey = (e) => {
   }
 }
 
-const handleMobileInput = (e) => {
-  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) {
-    mobileInputValue.value = userInputs.value.join('')
+const syncMobileInput = () => {
+  mobileInputValue.value = userInputs.value.join('')
+}
+
+const getSharedPrefixLength = (first, second) => {
+  let index = 0
+  while (index < first.length && index < second.length && first[index] === second[index]) index++
+  return index
+}
+
+const getSharedSuffixLength = (first, second, prefixLength) => {
+  let suffixLength = 0
+  while (
+    suffixLength < first.length - prefixLength &&
+    suffixLength < second.length - prefixLength &&
+    first[first.length - 1 - suffixLength] === second[second.length - 1 - suffixLength]
+  ) {
+    suffixLength++
+  }
+  return suffixLength
+}
+
+const reconcileMobileInput = (nextValue) => {
+  const previousValue = userInputs.value.join('')
+  const prefixLength = getSharedPrefixLength(previousValue, nextValue)
+  const suffixLength = getSharedSuffixLength(previousValue, nextValue, prefixLength)
+  const insertedText = nextValue.slice(prefixLength, nextValue.length - suffixLength)
+
+  while (userInputs.value.length > prefixLength && checkCanBackspace()) {
+    processBackspace(false)
+  }
+
+  // A protected word boundary prevented deletion; restore the displayed value.
+  if (userInputs.value.length !== prefixLength) {
+    syncMobileInput()
     return
   }
 
-  const val = e.target.value
-  if (val.length < userInputs.value.length) {
-    processBackspace(false)
-  } else if (val.length > userInputs.value.length) {
-    const char = val.slice(-1)
-    processCharacter(char)
+  // Pasted text is processed character by character, the same as keyboard input.
+  for (const character of insertedText) {
+    processCharacter(character)
   }
+
+  syncMobileInput()
+}
+
+const handleMobileInput = (e) => {
+  // Let the IME keep its temporary composition text until compositionend.
+  if (isComposing.value) return
+
+  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) {
+    syncMobileInput()
+    return
+  }
+
+  reconcileMobileInput(e.target.value)
+}
+
+const handleCompositionStart = () => {
+  isComposing.value = true
+}
+
+const handleCompositionEnd = (e) => {
+  isComposing.value = false
+  handleMobileInput(e)
 }
 
 const emitStatsData = () => {
@@ -417,6 +470,8 @@ onBeforeUnmount(() => {
         type="text" 
         v-model="mobileInputValue"
         @input="handleMobileInput"
+        @compositionstart="handleCompositionStart"
+        @compositionend="handleCompositionEnd"
         autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
         class="absolute inset-0 w-full h-full opacity-0 z-30 cursor-text resize-none" 
         :class="isKintsugi || isTransitioning || isSweeping ? 'pointer-events-none' : 'pointer-events-auto'"

@@ -44,7 +44,7 @@ const generatePassage = (count) => {
   }
 
   // Forcefully strip all punctuation including apostrophes for Flow mode
-  const streamOfConsciousness = combinedText.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim()
+  const streamOfConsciousness = combinedText.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").trim()
   const finalWords = streamOfConsciousness.split(' ').slice(0, count).join(' ')
 
   let poeticAuthor = "A Passing Stream"
