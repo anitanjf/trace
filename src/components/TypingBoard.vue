@@ -31,6 +31,27 @@ const isShaking = ref(false)
 const liveWPM = ref(0)
 const isTypingActive = ref(false)
 let typingTimeout = null
+const scheduledTimers = new Set()
+
+const schedule = (callback, delay) => {
+  const timer = setTimeout(() => {
+    scheduledTimers.delete(timer)
+    callback()
+  }, delay)
+  scheduledTimers.add(timer)
+  return timer
+}
+
+const cancelScheduledTimer = (timer) => {
+  if (!timer) return
+  clearTimeout(timer)
+  scheduledTimers.delete(timer)
+}
+
+const clearScheduledTimers = () => {
+  scheduledTimers.forEach(timer => clearTimeout(timer))
+  scheduledTimers.clear()
+}
 
 const isEntering = ref(true)
 const isSweeping = ref(false) 
@@ -50,6 +71,19 @@ const scrollOffset = ref(0)
 const viewportMaxHeight = ref('none')
 const linesTops = ref([])
 const lineHeight = ref(0)
+
+const canHandleBoardShortcut = () => {
+  const activeElement = document.activeElement
+  return !activeElement ||
+    activeElement === document.body ||
+    activeElement === mobileInputRef.value ||
+    typingArea.value?.contains(activeElement)
+}
+
+const handleResize = () => {
+  calculateLines()
+  updateCursor()
+}
 
 const getSessionElapsedMinutes = (now = Date.now()) => {
   if (!sessionStartTime.value) return 0
@@ -218,8 +252,8 @@ watch(() => props.quote, () => { nextTick(calculateLines) })
 
 const processCharacter = (char) => {
   isTypingActive.value = true
-  clearTimeout(typingTimeout)
-  typingTimeout = setTimeout(() => { isTypingActive.value = false }, 2000)
+  cancelScheduledTimer(typingTimeout)
+  typingTimeout = schedule(() => { isTypingActive.value = false }, 2000)
 
   if (userInputs.value.length >= poemCharacters.value.length) return
 
@@ -235,7 +269,7 @@ const processCharacter = (char) => {
     if (char !== ' ') {
       const sparkId = Date.now() + Math.random()
       keystrokeSparks.value.push({ id: sparkId, x: cursorAbsoluteX.value, y: cursorAbsoluteY.value, rotation: Math.random() * 360 })
-      setTimeout(() => { keystrokeSparks.value = keystrokeSparks.value.filter(s => s.id !== sparkId) }, 400)
+      schedule(() => { keystrokeSparks.value = keystrokeSparks.value.filter(s => s.id !== sparkId) }, 400)
     }
   } else {
     sessionMistakes.value++
@@ -255,7 +289,7 @@ const processCharacter = (char) => {
       if (cleanWord.length > 0) missedWords.value.add(cleanWord)
     }
     isShaking.value = true
-    setTimeout(() => { isShaking.value = false }, 300)
+    schedule(() => { isShaking.value = false }, 300)
   }
 
   const minutes = getSessionElapsedMinutes()
@@ -284,6 +318,8 @@ const processBackspace = (isCtrl) => {
 }
 
 const handleKey = (e) => {
+  if (!canHandleBoardShortcut()) return
+
   if (e.key === 'Escape') { 
     if (props.isPaused) emit('resume')
     else emit('pause')
@@ -393,29 +429,29 @@ const triggerCompletion = () => {
   viewportMaxHeight.value = 'none' 
   scrollOffset.value = 0
   
-  setTimeout(() => {
+  schedule(() => {
     isKintsugi.value = false
     isSweeping.value = true
 
     // Preserve the ink sweep without tying the wait to passage length.
     const sweepDuration = 300
 
-    setTimeout(() => {
+    schedule(() => {
       isTransitioning.value = true
-      setTimeout(() => { emitStatsData() }, 150)
+      schedule(() => { emitStatsData() }, 150)
     }, sweepDuration)
   }, 300)
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleKey, { passive: false })
-  window.addEventListener('resize', () => { calculateLines(); updateCursor(); })
+  window.addEventListener('resize', handleResize)
   
   const enterDelay = props.gameMode === 'flow' ? 300 : 450
 
-  setTimeout(() => { 
+  schedule(() => { 
     isEntering.value = false; 
-    setTimeout(() => {
+    schedule(() => {
        calculateLines(); 
        updateCursor();
     }, 50)
@@ -424,8 +460,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKey)
-  window.removeEventListener('resize', () => { calculateLines(); updateCursor(); })
-  clearTimeout(typingTimeout)
+  window.removeEventListener('resize', handleResize)
+  clearScheduledTimers()
+  typingTimeout = null
 })
 </script>
 
