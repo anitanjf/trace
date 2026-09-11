@@ -13,6 +13,9 @@ const props = defineProps({
 
 const emit = defineEmits(['passage-complete', 'pause', 'resume'])
 
+const createSessionId = () =>
+  globalThis.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
+
 const userInputs = ref([])
 const mobileInputValue = ref('')
 const isComposing = ref(false)
@@ -26,6 +29,7 @@ const sessionKeystrokes = ref(0)
 const sessionMistakes = ref(0)
 const sessionStartTime = ref(null)
 const sessionEndTime = ref(null)
+const sessionId = createSessionId()
 const pauseStartTime = ref(0) 
 const liveWPM = ref(0)
 const isTypingActive = ref(false)
@@ -411,6 +415,8 @@ const emitStatsData = () => {
   const accuracy = Math.max(0, Math.round(((sessionKeystrokes.value - sessionMistakes.value) / sessionKeystrokes.value) * 100))
   
   emit('passage-complete', {
+    sessionId,
+    completedAt: Date.now(),
     wpm, 
     accuracy, 
     keystrokes: sessionKeystrokes.value, 
