@@ -13,7 +13,9 @@ const router = useRouter()
 const showAuthModal = ref(false)
 const activeTab = ref(getRealWorldSeason())
 const expandedPassageId = ref(null)
-const searchQuery = ref('') 
+const searchQuery = ref('')
+const profileMessage = ref('')
+const profileMessageType = ref('') 
 
 // Hover states
 const hoveredMetric = ref(null)
@@ -43,6 +45,7 @@ const customProfile = ref({
 
 const fetchProfile = async () => {
   if (!currentUser.value) return
+  profileMessage.value = ''
   try {
     const docRef = doc(db, 'users', currentUser.value.uid)
     const snap = await getDoc(docRef)
@@ -50,18 +53,23 @@ const fetchProfile = async () => {
       customProfile.value = { ...customProfile.value, ...snap.data().profile }
     }
   } catch (err) {
-    console.error('Failed to fetch profile', err)
+    profileMessageType.value = 'error'
+    profileMessage.value = err?.message || 'Could not load your profile. Please try again.'
   }
 }
 
 const saveProfile = async () => {
   if (!currentUser.value) return
+  profileMessage.value = ''
   try {
     const docRef = doc(db, 'users', currentUser.value.uid)
     await setDoc(docRef, { profile: customProfile.value }, { merge: true })
     isEditing.value = false
+    profileMessageType.value = 'success'
+    profileMessage.value = 'Profile saved.'
   } catch (err) {
-    console.error('Failed to save profile', err)
+    profileMessageType.value = 'error'
+    profileMessage.value = err?.message || 'Could not save your profile. Your edits are still here.'
   }
 }
 

@@ -1,6 +1,7 @@
 <script setup>
 import Atmosphere from './components/Atmosphere.vue'
 import ZenLoader from './components/ZenLoader.vue'
+import SyncStatus from './components/SyncStatus.vue'
 import { isAppReady, settings, shouldReduceMotion } from './store'
 </script>
 
@@ -53,6 +54,7 @@ import { isAppReady, settings, shouldReduceMotion } from './store'
       .poem-text-sumi { font-family: 'Yuji Syuku', serif !important; letter-spacing: 0.15em !important; }
     </component>
 
+    <SyncStatus />
   </div>
 </template>
 

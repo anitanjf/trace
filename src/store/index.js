@@ -4,6 +4,8 @@ import { auth, db } from '../services/firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore'
 
+const STORAGE_SCHEMA_VERSION = 2
+
 const getDefaultStats = () => ({
   lifetimePassages: 0,
   lifetimeDaily: 0,
@@ -48,6 +50,41 @@ export const stats = ref(getDefaultStats())
 export const settings = ref(getDefaultSettings())
 export const timeOfDay = ref('day')
 export const currentUser = ref(null)
+export const syncStatus = ref('local')
+export const syncError = ref('')
+export const storageRecoveryNotice = ref('')
+
+let activeSyncs = 0
+const beginSync = () => {
+  activeSyncs += 1
+  syncError.value = ''
+  syncStatus.value = 'syncing'
+}
+const completeSync = () => {
+  activeSyncs = Math.max(0, activeSyncs - 1)
+  if (activeSyncs === 0 && !syncError.value) syncStatus.value = currentUser.value ? 'synced' : 'local'
+}
+const failSync = (error) => {
+  activeSyncs = Math.max(0, activeSyncs - 1)
+  syncError.value = error?.message || 'Please check your connection and try again.'
+  syncStatus.value = 'error'
+}
+
+const encodeStoredValue = data => JSON.stringify({ schemaVersion: STORAGE_SCHEMA_VERSION, data })
+const readStoredValue = (key) => {
+  const raw = localStorage.getItem(key)
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid stored data')
+    return parsed?.schemaVersion && parsed?.data ? parsed.data : parsed
+  } catch (error) {
+    try { localStorage.setItem(`${key}_recovery_backup`, raw) } catch {}
+    localStorage.removeItem(key)
+    storageRecoveryNotice.value = 'Recovered from damaged local data. A backup was kept on this device.'
+    return null
+  }
+}
 
 export const isAppReady = ref(false)
 export const systemPrefersReducedMotion = ref(false)
@@ -62,13 +99,17 @@ export const applyAppearancePreference = () => {
 }
 
 const syncSettingsToCloud = async (uid, currentSettings) => {
+  beginSync()
   try {
     await setDoc(doc(db, 'users', uid), {
       settings: currentSettings,
+      schemaVersion: STORAGE_SCHEMA_VERSION,
       lastSynced: Date.now()
     }, { merge: true })
+    completeSync()
   } catch (error) {
-    console.error('Failed to sync settings:', error)
+    failSync(error)
+    throw error
   }
 }
 
@@ -131,14 +172,42 @@ const mergeProgress = (remoteStats = {}, localStats = {}) => {
 }
 
 const syncProgressToCloud = async (uid, localStats) => {
+  beginSync()
   const userRef = doc(db, 'users', uid)
-  return runTransaction(db, async transaction => {
-    const snapshot = await transaction.get(userRef)
-    const remoteStats = snapshot.exists() ? snapshot.data().stats : getDefaultStats()
-    const mergedStats = mergeProgress(remoteStats, localStats)
-    transaction.set(userRef, { stats: mergedStats, lastSynced: Date.now() }, { merge: true })
-    return mergedStats
-  })
+  try {
+    const merged = await runTransaction(db, async transaction => {
+      const snapshot = await transaction.get(userRef)
+      const remoteStats = snapshot.exists() ? snapshot.data().stats : getDefaultStats()
+      const mergedStats = mergeProgress(remoteStats, localStats)
+      transaction.set(userRef, {
+        stats: mergedStats,
+        schemaVersion: STORAGE_SCHEMA_VERSION,
+        lastSynced: Date.now()
+      }, { merge: true })
+      return mergedStats
+    })
+    completeSync()
+    return merged
+  } catch (error) {
+    failSync(error)
+    throw error
+  }
+}
+
+export const retrySync = async () => {
+  if (!currentUser.value) {
+    syncStatus.value = 'local'
+    return
+  }
+  const uid = currentUser.value.uid
+  try {
+    const merged = await syncProgressToCloud(uid, JSON.parse(JSON.stringify(stats.value)))
+    if (currentUser.value?.uid !== uid) return
+    stats.value = merged
+    await syncSettingsToCloud(uid, settings.value)
+  } catch {
+    // Individual sync functions expose the actionable error state.
+  }
 }
 
 let progressSyncTimer = null
@@ -240,14 +309,15 @@ export const initStore = () => {
 
   if (typeof window !== 'undefined') window.addEventListener('online', scheduleProgressSync)
 
-  const savedStats = localStorage.getItem('zen_stats')
-  const savedSettings = localStorage.getItem('zen_settings')
+  const savedStats = readStoredValue('zen_stats')
+  const savedSettings = readStoredValue('zen_settings')
   let localPreferences = {}
   
   if (savedStats) {
-    const parsed = JSON.parse(savedStats)
+    const parsed = savedStats
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
-    if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
+    if (parsed.activityGrid === undefined) parsed.activityGrid = {}
+    if (!parsed.seasonal || typeof parsed.seasonal !== 'object') parsed.seasonal = getDefaultStats().seasonal 
     if (parsed.passageHistory === undefined) parsed.passageHistory = {}
     if (parsed.sessionLedger === undefined) {
       parsed.sessionLedger = {}
@@ -273,10 +343,11 @@ export const initStore = () => {
       parsed.seasonal[5] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
     }
     stats.value = { ...stats.value, ...parsed }
+    localStorage.setItem('zen_stats', encodeStoredValue(stats.value))
   }
   
   if (savedSettings) {
-    const parsedSettings = JSON.parse(savedSettings)
+    const parsedSettings = savedSettings
     if (parsedSettings.timeAtmosphere === undefined) parsedSettings.timeAtmosphere = true
     if (!['system', 'light', 'dark'].includes(parsedSettings.appearanceMode)) parsedSettings.appearanceMode = parsedSettings.darkMode ? 'dark' : 'light'
     if (!parsedSettings.themeMode || parsedSettings.themeMode === 'journey') parsedSettings.themeMode = 'realtime'
@@ -288,17 +359,18 @@ export const initStore = () => {
     localPreferences = { ...parsedSettings }
     
     applyAppearancePreference()
+    localStorage.setItem('zen_settings', encodeStoredValue(settings.value))
   }
 
   watch(stats, (newStats) => {
-    localStorage.setItem('zen_stats', JSON.stringify(newStats))
+    localStorage.setItem('zen_stats', encodeStoredValue(newStats))
   }, { deep: true })
 
   watch(settings, (newSettings) => {
     applyAppearancePreference()
     localPreferences = { ...newSettings }
-    localStorage.setItem('zen_settings', JSON.stringify(newSettings))
-    if (currentUser.value) syncSettingsToCloud(currentUser.value.uid, newSettings)
+    localStorage.setItem('zen_settings', encodeStoredValue(newSettings))
+    if (currentUser.value) syncSettingsToCloud(currentUser.value.uid, newSettings).catch(() => {})
   }, { deep: true })
 
   onAuthStateChanged(auth, async (user) => {
@@ -327,9 +399,11 @@ export const initStore = () => {
           await syncSettingsToCloud(user.uid, settings.value)
         }
       } catch (error) {
-        console.error("Error loading profile from cloud:", error)
+        failSync(error)
       }
     } else if (previousUser) {
+      syncStatus.value = 'local'
+      syncError.value = ''
       stats.value = getDefaultStats()
       localStorage.removeItem('zen_stats')
     }

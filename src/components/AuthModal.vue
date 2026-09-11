@@ -5,14 +5,16 @@ import { logInWithGoogle } from '../services/firebase'
 
 const emit = defineEmits(['close'])
 const isAuthenticating = ref(false)
+const authError = ref('')
 
 const handleGoogleLogin = async () => {
   isAuthenticating.value = true
+  authError.value = ''
   try {
     await logInWithGoogle()
     emit('close')
   } catch (error) {
-    console.error("Authentication failed:", error)
+    authError.value = error?.message || 'Sign-in failed. Please try again.'
     isAuthenticating.value = false
   }
 }
@@ -69,6 +71,8 @@ const handleGoogleLogin = async () => {
             {{ isAuthenticating ? 'Connecting...' : 'Continue with Google' }}
           </span>
         </button>
+
+        <p v-if="authError" class="mb-4 text-[10px] leading-relaxed text-red-600" role="alert">{{ authError }}</p>
 
         <!-- Cancel Text Link -->
         <button @click="emit('close')" :disabled="isAuthenticating" 
