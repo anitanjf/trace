@@ -23,7 +23,8 @@ const activeMistakeMarks = ref({})
 const keystrokeSparks = ref([]) 
 const sessionKeystrokes = ref(0)
 const sessionMistakes = ref(0)
-const sessionStartTime = ref(Date.now())
+const sessionStartTime = ref(null)
+const sessionEndTime = ref(null)
 const pauseStartTime = ref(0) 
 const isShaking = ref(false)
 const liveWPM = ref(0)
@@ -49,15 +50,19 @@ const viewportMaxHeight = ref('none')
 const linesTops = ref([])
 const lineHeight = ref(0)
 
+const getSessionElapsedMinutes = (now = Date.now()) => {
+  if (!sessionStartTime.value) return 0
+  const endTime = sessionEndTime.value ?? now
+  return Math.max((endTime - sessionStartTime.value) / 60000, 0.01)
+}
+
 watch(() => props.isPaused, (isNowPaused) => {
   if (isNowPaused) {
-    pauseStartTime.value = Date.now()
-    if (mobileInputRef.value) mobileInputRef.value.blur() 
-  } else {
-    if (pauseStartTime.value > 0) {
-      sessionStartTime.value += (Date.now() - pauseStartTime.value)
-      pauseStartTime.value = 0
-    }
+    if (sessionStartTime.value && !sessionEndTime.value) pauseStartTime.value = Date.now()
+    if (mobileInputRef.value) mobileInputRef.value.blur()
+  } else if (pauseStartTime.value > 0 && sessionStartTime.value && !sessionEndTime.value) {
+    sessionStartTime.value += Date.now() - pauseStartTime.value
+    pauseStartTime.value = 0
   }
 })
 
@@ -220,6 +225,8 @@ const processCharacter = (char) => {
   const currentIndex = userInputs.value.length
   const expectedChar = poemCharacters.value[currentIndex]
   
+  if (!sessionStartTime.value) sessionStartTime.value = Date.now()
+
   sessionKeystrokes.value++
   userInputs.value.push(char)
 
@@ -250,10 +257,11 @@ const processCharacter = (char) => {
     setTimeout(() => { isShaking.value = false }, 300)
   }
 
-  const minutes = Math.max((Date.now() - sessionStartTime.value) / 60000, 0.01)
+  const minutes = getSessionElapsedMinutes()
   liveWPM.value = Math.round((userInputs.value.length / 5) / minutes)
 
   if (userInputs.value.length === poemCharacters.value.length) {
+    sessionEndTime.value = Date.now()
     isTypingActive.value = false
     if (mobileInputRef.value) mobileInputRef.value.blur()
     triggerCompletion()
@@ -312,7 +320,7 @@ const handleMobileInput = (e) => {
 }
 
 const emitStatsData = () => {
-  const timeInMinutes = Math.max((Date.now() - sessionStartTime.value) / 60000, 0.01)
+  const timeInMinutes = getSessionElapsedMinutes()
   const wpm = Math.round((processedQuoteText.value.length / 5) / timeInMinutes)
   const accuracy = Math.max(0, Math.round(((sessionKeystrokes.value - sessionMistakes.value) / sessionKeystrokes.value) * 100))
   
@@ -358,8 +366,7 @@ onMounted(() => {
     isEntering.value = false; 
     setTimeout(() => {
        calculateLines(); 
-       updateCursor(); 
-       sessionStartTime.value = Date.now();
+       updateCursor();
     }, 50)
   }, enterDelay)
 })
