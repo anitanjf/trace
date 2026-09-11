@@ -49,7 +49,7 @@ const initGame = async () => {
     dailyQuote.value = passages[startIndex]
     isFirstCompletionOfDay.value = true
     isCurrentQuoteArchived.value = false
-    setTimeout(() => { gameState.value = 'playing' }, 1500)
+    gameState.value = 'playing'
   } catch (error) {
     console.error("Failed to load daily passage", error)
   }
