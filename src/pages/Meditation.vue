@@ -90,10 +90,12 @@ const handlePause = () => { gameState.value = 'paused' }
 const handleResume = () => { gameState.value = 'playing' }
 
 const handleCompletion = (results) => {
+  if (!results.sessionId || stats.value.sessionLedger?.[results.sessionId]) return
   attemptsArray.value.push(results)
   const currentS = activeVisualIndex.value
+  const countsAsPassage = isFirstCompletionOfPassage.value
   
-  if (isFirstCompletionOfPassage.value) {
+  if (countsAsPassage) {
     stats.value.lifetimePassages++
     if (!stats.value.seasonal[currentS]) stats.value.seasonal[currentS] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
     stats.value.seasonal[currentS].passages++
@@ -105,7 +107,15 @@ const handleCompletion = (results) => {
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  recordSession()
+  recordSession({
+    id: results.sessionId,
+    completedAt: results.completedAt,
+    mode: 'meditation',
+    season: currentS,
+    passageDelta: countsAsPassage ? 1 : 0,
+    keystrokes: results.keystrokes,
+    mistakes: results.mistakes
+  })
   checkEnlightenments(results) 
   gameState.value = 'complete'
 }
