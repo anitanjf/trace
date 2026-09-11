@@ -44,14 +44,14 @@ import { isAppReady, settings, shouldReduceMotion } from './store'
       .font-ui-serif { font-family: 'Cormorant Garamond', serif !important; }
       .font-ui-sans { font-family: 'Plus Jakarta Sans', sans-serif !important; }
       
-      .poem-text-calligraphy { font-family: 'Playfair Display', serif !important; letter-spacing: 0.25em !important; }
-      .poem-text-minimalist { font-family: 'Questrial', sans-serif !important; letter-spacing: 0.25em !important; }
-      .poem-text-mono { font-family: 'Courier Prime', monospace !important; letter-spacing: 0.15em !important; }
-      .poem-text-antique { font-family: 'Cinzel', serif !important; letter-spacing: 0.25em !important; }
-      .poem-text-classic { font-family: 'Cormorant Garamond', serif !important; letter-spacing: 0.25em !important; }
-      .poem-text-modern { font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.2em !important; }
-      .poem-text-brush { font-family: 'Zhi Mang Xing', cursive !important; letter-spacing: 0.15em !important; }
-      .poem-text-sumi { font-family: 'Yuji Syuku', serif !important; letter-spacing: 0.15em !important; }
+      .poem-text-calligraphy { font-family: 'Playfair Display', serif !important; letter-spacing: 0.08em !important; }
+      .poem-text-minimalist { font-family: 'Questrial', sans-serif !important; letter-spacing: 0.06em !important; }
+      .poem-text-mono { font-family: 'Courier Prime', monospace !important; letter-spacing: 0.05em !important; }
+      .poem-text-antique { font-family: 'Cinzel', serif !important; letter-spacing: 0.08em !important; }
+      .poem-text-classic { font-family: 'Cormorant Garamond', serif !important; letter-spacing: 0.06em !important; }
+      .poem-text-modern { font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.04em !important; }
+      .poem-text-brush { font-family: 'Zhi Mang Xing', cursive !important; letter-spacing: 0.05em !important; }
+      .poem-text-sumi { font-family: 'Yuji Syuku', serif !important; letter-spacing: 0.05em !important; }
     </component>
 
     <SyncStatus />
