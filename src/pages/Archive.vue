@@ -11,10 +11,12 @@ const showAuthModal = ref(false)
 
 const preservedQuotes = ref([])
 const isFetchingArchive = ref(true)
+const archiveError = ref('')
 
 const fetchArchivedQuotes = async () => {
   if (!currentUser.value) return
   isFetchingArchive.value = true
+  archiveError.value = ''
   
   try {
     const q = query(
@@ -24,7 +26,7 @@ const fetchArchivedQuotes = async () => {
     const querySnapshot = await getDocs(q)
     preservedQuotes.value = querySnapshot.docs.map(doc => doc.data())
   } catch (error) {
-    console.error("Error fetching preserved quotes:", error)
+    archiveError.value = error?.message || 'Could not load your archive.'
   } finally {
     isFetchingArchive.value = false
   }
@@ -70,6 +72,10 @@ const handleModalClose = () => {
     <div class="w-full flex-1 flex flex-col animate-fade-in" style="animation-delay: 100ms;">
       
       <template v-if="currentUser">
+        <div v-if="archiveError" class="mb-8 flex flex-col items-center gap-3 text-center" role="alert">
+          <p class="text-xs text-red-500">{{ archiveError }}</p>
+          <button @click="fetchArchivedQuotes" class="text-[10px] uppercase tracking-widest underline underline-offset-4">Retry</button>
+        </div>
         
         <!-- SINGLE COLUMN "SCROLL" OF QUOTES -->
         <div v-if="preservedQuotes.length > 0" class="w-full mb-12 flex flex-col items-center">
