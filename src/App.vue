@@ -111,4 +111,14 @@ import { isAppReady, settings, shouldReduceMotion } from './store'
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
 }
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid #b7791f;
+  outline-offset: 4px;
+  border-radius: 0.375rem;
+}
+
+.reduce-motion :where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  transition: none !important;
+}
 </style>
