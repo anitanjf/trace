@@ -35,7 +35,11 @@ const getDefaultSettings = () => ({
   showLiveWPM: false,
   timeAtmosphere: true,       
   themeMode: 'realtime',      
-  lockedSeason: getRealWorldSeason()             
+  lockedSeason: getRealWorldSeason(),
+  motionMode: 'system',
+  showAtmosphereEffects: true,
+  showCursorEffects: true,
+  showKeystrokeEffects: true
 })
 
 export const stats = ref(getDefaultStats())
@@ -43,7 +47,11 @@ export const settings = ref(getDefaultSettings())
 export const timeOfDay = ref('day')
 export const currentUser = ref(null)
 
-export const isAppReady = ref(false) 
+export const isAppReady = ref(false)
+export const systemPrefersReducedMotion = ref(false)
+export const shouldReduceMotion = () =>
+  settings.value.motionMode === 'reduced' ||
+  (settings.value.motionMode !== 'full' && systemPrefersReducedMotion.value)
 
 const syncToCloud = async (uid, currentStats, currentSettings) => {
   try {
@@ -108,6 +116,13 @@ export const checkEnlightenments = (results) => {
 export const initStore = () => {
   timeOfDay.value = calculateTimeOfDay()
 
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const updateMotionPreference = () => { systemPrefersReducedMotion.value = motionQuery.matches }
+    updateMotionPreference()
+    motionQuery.addEventListener?.('change', updateMotionPreference)
+  }
+
   const savedStats = localStorage.getItem('zen_stats')
   const savedSettings = localStorage.getItem('zen_settings')
   
@@ -129,6 +144,7 @@ export const initStore = () => {
     if (parsedSettings.timeAtmosphere === undefined) parsedSettings.timeAtmosphere = true
     if (!parsedSettings.themeMode || parsedSettings.themeMode === 'journey') parsedSettings.themeMode = 'realtime'
     if (parsedSettings.lockedSeason === undefined) parsedSettings.lockedSeason = getRealWorldSeason()
+    if (!['system', 'reduced', 'full'].includes(parsedSettings.motionMode)) parsedSettings.motionMode = 'system'
     if (parsedSettings.fontFamily === 'serif' || parsedSettings.fontFamily === 'mincho') parsedSettings.fontFamily = 'calligraphy'
     if (parsedSettings.fontFamily === 'sans' || parsedSettings.fontFamily === 'gothic') parsedSettings.fontFamily = 'minimalist'
     settings.value = { ...settings.value, ...parsedSettings }
