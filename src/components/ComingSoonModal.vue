@@ -1,7 +1,12 @@
 <script setup>
+import { ref } from 'vue'
 import { settings } from '../store'
+import { useFocusTrap } from '../composables/useFocusTrap'
 
 const emit = defineEmits(['close'])
+const dialogRef = ref(null)
+const closeDialog = () => emit('close')
+useFocusTrap(dialogRef, { onEscape: closeDialog })
 </script>
 
 <template>
@@ -10,10 +15,10 @@ const emit = defineEmits(['close'])
     <!-- Blurred Dark/Light Backdrop -->
     <div class="absolute inset-0 transition-colors duration-1000" 
          :class="settings?.darkMode ? 'bg-black/60 backdrop-blur-[2px]' : 'bg-stone-900/30 backdrop-blur-[2px]'" 
-         @click="emit('close')"></div>
+         @click="closeDialog" aria-hidden="true"></div>
 
     <!-- Modal Container -->
-    <div class="relative w-full max-w-sm flex flex-col items-center justify-center p-12 text-center group">
+    <div ref="dialogRef" role="dialog" aria-modal="true" aria-labelledby="coming-soon-title" tabindex="-1" class="relative w-full max-w-sm flex flex-col items-center justify-center p-12 text-center group">
       
       <!-- Organic Ink-Blot Background Layer -->
       <div class="absolute inset-0 rounded-2xl shadow-xl transition-colors duration-1000" 
@@ -23,7 +28,7 @@ const emit = defineEmits(['close'])
       <!-- Modal Content -->
       <div class="relative z-10 flex flex-col items-center w-full">
         
-        <h3 class="text-xl sm:text-2xl tracking-[0.25em] uppercase font-light mb-6 font-ui-serif" 
+        <h3 id="coming-soon-title" class="text-xl sm:text-2xl tracking-[0.25em] uppercase font-light mb-6 font-ui-serif" 
             :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-800'">
           The River Widens
         </h3>
@@ -34,7 +39,7 @@ const emit = defineEmits(['close'])
         </p>
 
         <!-- Ink-Blot Close Button -->
-        <button @click="emit('close')" 
+        <button @click="closeDialog" aria-label="Close multiplayer information dialog" 
                 class="relative w-full py-4 px-6 group/btn transition-transform duration-300 hover:scale-[1.02] flex items-center justify-center">
           
           <!-- Permanent Ink Mark Background -->
