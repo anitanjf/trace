@@ -106,8 +106,6 @@ export const checkEnlightenments = (results) => {
 }
 
 export const initStore = () => {
-  const appStartTime = Date.now() 
-
   timeOfDay.value = calculateTimeOfDay()
 
   const savedStats = localStorage.getItem('zen_stats')
@@ -192,8 +190,6 @@ export const initStore = () => {
       localStorage.removeItem('zen_settings')
     }
 
-    const elapsed = Date.now() - appStartTime
-    const remainingDelay = Math.max(3000 - elapsed, 0)
-    setTimeout(() => { isAppReady.value = true }, remainingDelay)
+    isAppReady.value = true
   })
 }
