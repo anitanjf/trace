@@ -72,7 +72,33 @@ const syncSettingsToCloud = async (uid, currentSettings) => {
   }
 }
 
+const getInstallationId = () => {
+  const existing = localStorage.getItem('zen_installation_id')
+  if (existing) return existing
+  const created = globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  localStorage.setItem('zen_installation_id', created)
+  return created
+}
+
 const applySessionDelta = (target, session) => {
+  if (session.legacySeasonal) {
+    for (const [season, values] of Object.entries(session.legacySeasonal)) {
+      if (!target.seasonal[season]) target.seasonal[season] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
+      target.seasonal[season].passages += values.passages || 0
+      target.seasonal[season].keystrokes += values.keystrokes || 0
+      target.seasonal[season].mistakes += values.mistakes || 0
+      target.seasonal[season].quotes = [...new Set([...(target.seasonal[season].quotes || []), ...(values.quotes || [])])]
+    }
+    for (const [date, count] of Object.entries(session.legacyActivity || {})) {
+      target.activityGrid[date] = (target.activityGrid[date] || 0) + count
+    }
+    target.lifetimePassages += session.passageDelta || 0
+    target.lifetimeDaily += session.dailyDelta || 0
+    target.lifetimeKeystrokes += session.keystrokes || 0
+    target.lifetimeMistakes += session.mistakes || 0
+    return
+  }
+
   const season = session.season ?? getRealWorldSeason()
   if (!target.seasonal[season]) target.seasonal[season] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
   target.lifetimePassages += session.passageDelta || 0
@@ -223,7 +249,24 @@ export const initStore = () => {
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
     if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
     if (parsed.passageHistory === undefined) parsed.passageHistory = {}
-    if (parsed.sessionLedger === undefined) parsed.sessionLedger = {} 
+    if (parsed.sessionLedger === undefined) {
+      parsed.sessionLedger = {}
+      const hasLegacyProgress = parsed.lifetimePassages || parsed.lifetimeDaily || parsed.lifetimeKeystrokes || parsed.lifetimeMistakes
+      if (hasLegacyProgress) {
+        const legacyId = `legacy-${getInstallationId()}`
+        parsed.sessionLedger[legacyId] = {
+          id: legacyId,
+          mode: 'legacy-import',
+          completedAt: Date.now(),
+          passageDelta: parsed.lifetimePassages || 0,
+          dailyDelta: parsed.lifetimeDaily || 0,
+          keystrokes: parsed.lifetimeKeystrokes || 0,
+          mistakes: parsed.lifetimeMistakes || 0,
+          legacySeasonal: parsed.seasonal || {},
+          legacyActivity: parsed.activityGrid || {}
+        }
+      }
+    } 
     if (parsed.achievements === undefined) parsed.achievements = getDefaultStats().achievements // Backwards compatibility hook
     if (!parsed.seasonal[4]) {
       parsed.seasonal[4] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
