@@ -43,7 +43,10 @@ const getDefaultSettings = () => ({
   motionMode: 'system',
   showAtmosphereEffects: true,
   showCursorEffects: true,
-  showKeystrokeEffects: true
+  showKeystrokeEffects: true,
+  textSize: 'medium',
+  lineSpacing: 'comfortable',
+  textAlignment: 'center'
 })
 
 export const stats = ref(getDefaultStats())
@@ -353,6 +356,9 @@ export const initStore = () => {
     if (!parsedSettings.themeMode || parsedSettings.themeMode === 'journey') parsedSettings.themeMode = 'realtime'
     if (parsedSettings.lockedSeason === undefined) parsedSettings.lockedSeason = getRealWorldSeason()
     if (!['system', 'reduced', 'full'].includes(parsedSettings.motionMode)) parsedSettings.motionMode = 'system'
+    if (!['small', 'medium', 'large'].includes(parsedSettings.textSize)) parsedSettings.textSize = 'medium'
+    if (!['compact', 'comfortable', 'spacious'].includes(parsedSettings.lineSpacing)) parsedSettings.lineSpacing = 'comfortable'
+    if (!['left', 'center'].includes(parsedSettings.textAlignment)) parsedSettings.textAlignment = 'center'
     if (parsedSettings.fontFamily === 'serif' || parsedSettings.fontFamily === 'mincho') parsedSettings.fontFamily = 'calligraphy'
     if (parsedSettings.fontFamily === 'sans' || parsedSettings.fontFamily === 'gothic') parsedSettings.fontFamily = 'minimalist'
     settings.value = { ...settings.value, ...parsedSettings }

@@ -132,6 +132,22 @@ const poemWords = computed(() => {
   return words
 })
 
+const textSizeClass = computed(() => ({
+  small: 'text-base sm:text-xl md:text-2xl',
+  medium: 'text-lg sm:text-2xl md:text-3xl',
+  large: 'text-xl sm:text-3xl md:text-4xl'
+}[settings.value.textSize] || 'text-lg sm:text-2xl md:text-3xl'))
+
+const lineSpacingClass = computed(() => ({
+  compact: 'leading-relaxed',
+  comfortable: 'leading-loose',
+  spacious: 'leading-[2.2]'
+}[settings.value.lineSpacing] || 'leading-loose'))
+
+const textAlignmentClass = computed(() =>
+  settings.value.textAlignment === 'left' ? 'text-left' : 'text-center'
+)
+
 const fontClass = computed(() => {
   switch(settings.value.fontFamily) {
     case 'minimalist': return 'poem-text-minimalist'
@@ -526,7 +542,7 @@ onBeforeUnmount(() => {
              WebkitMaskImage: viewportMaxHeight !== 'none' ? 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)' : 'none' 
            }">
           
-          <div ref="textContainer" class="relative z-10 transition-all duration-[800ms] ease-in-out will-change-transform text-center" 
+          <div ref="textContainer" class="relative z-10 transition-all duration-[800ms] ease-in-out will-change-transform" 
                :style="{ transform: (isKintsugi || isSweeping || isTransitioning) ? 'translateY(0px)' : `translateY(-${scrollOffset}px)` }" 
                :class="[
                  fontClass,
@@ -553,7 +569,7 @@ onBeforeUnmount(() => {
                         (!isEntering && !isKintsugi && !isSweeping ? [
                           c.index < typedCount && userInputs[c.index] === c.char ? ( settings?.darkMode ? 'text-stone-100 opacity-100' : 'text-stone-900 opacity-100' ) : '',
                           c.index < typedCount && userInputs[c.index] !== c.char ? 'text-red-400 opacity-100 drop-shadow-[0_0_8px_rgba(248,113,113,0.4)]' : '',
-                          c.index > typedCount ? ( settings?.darkMode ? 'text-stone-300 opacity-40' : 'text-stone-600 opacity-40' ) : '',
+                          c.index > typedCount ? ( settings?.darkMode ? 'text-stone-300 opacity-60' : 'text-stone-600 opacity-70' ) : '',
                           c.index === typedCount ? ( settings?.darkMode ? 'text-stone-100 opacity-100 drop-shadow-[0_0_8px_rgba(255,255,255,0.6)] animate-blink' : 'text-stone-900 opacity-100 drop-shadow-[0_0_8px_rgba(0,0,0,0.3)] animate-blink' ) : ''
                         ] : '')
                       ]">
