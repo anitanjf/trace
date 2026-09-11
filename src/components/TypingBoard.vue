@@ -132,21 +132,19 @@ const poemWords = computed(() => {
   return words
 })
 
-const textSizeClass = computed(() => ({
-  small: 'text-base sm:text-xl md:text-2xl',
-  medium: 'text-lg sm:text-2xl md:text-3xl',
-  large: 'text-xl sm:text-3xl md:text-4xl'
-}[settings.value.textSize] || 'text-lg sm:text-2xl md:text-3xl'))
-
-const lineSpacingClass = computed(() => ({
-  compact: 'leading-relaxed',
-  comfortable: 'leading-loose',
-  spacious: 'leading-[2.2]'
-}[settings.value.lineSpacing] || 'leading-loose'))
-
-const textAlignmentClass = computed(() =>
-  settings.value.textAlignment === 'left' ? 'text-left' : 'text-center'
-)
+const readabilityStyle = computed(() => {
+  const fontSizes = {
+    small: 'clamp(1rem, 2vw, 1.5rem)',
+    medium: 'clamp(1.25rem, 2.7vw, 2rem)',
+    large: 'clamp(1.6rem, 3.6vw, 2.75rem)'
+  }
+  const lineHeights = { compact: '1.5', comfortable: '1.9', spacious: '2.3' }
+  return {
+    fontSize: fontSizes[settings.value.textSize] || fontSizes.medium,
+    lineHeight: lineHeights[settings.value.lineSpacing] || lineHeights.comfortable,
+    textAlign: settings.value.textAlignment === 'left' ? 'left' : 'center'
+  }
+})
 
 const fontClass = computed(() => {
   switch(settings.value.fontFamily) {
@@ -542,14 +540,9 @@ onBeforeUnmount(() => {
              WebkitMaskImage: viewportMaxHeight !== 'none' ? 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)' : 'none' 
            }">
           
-          <div ref="textContainer" class="relative z-10 transition-all duration-[800ms] ease-in-out will-change-transform" 
-               :style="{ transform: (isKintsugi || isSweeping || isTransitioning) ? 'translateY(0px)' : `translateY(-${scrollOffset}px)` }" 
-               :class="[
-                 fontClass,
-                 (props.gameMode === 'flow' && (isKintsugi || isTransitioning || isSweeping))
-                   ? 'text-[14px] leading-[2.5]'
-                   : 'text-xl sm:text-2xl md:text-3xl leading-relaxed sm:leading-loose'
-               ]">
+          <div ref="textContainer" class="relative z-10 w-full transition-all duration-[800ms] ease-in-out will-change-transform" 
+               :style="{ ...readabilityStyle, transform: (isKintsugi || isSweeping || isTransitioning) ? 'translateY(0px)' : `translateY(-${scrollOffset}px)` }" 
+               :class="fontClass">
             
             <div class="absolute top-0 left-0 z-20 pointer-events-none cursor-glide" :style="cursorStyle"></div>
             
