@@ -157,7 +157,22 @@ const toggleTimeAtmosphere = () => {
           </div>
         </div>
         
-        <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
+        <!-- Custom Motion Toggle -->
+        <div class="flex justify-between items-center transition-opacity duration-300">
+          <div class="flex flex-col">
+            <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">Motion</span>
+            <span class="text-[9px] uppercase tracking-widest mt-1 opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">System, Reduced, or Full</span>
+          </div>
+          <div class="flex gap-1">
+            <button v-for="mode in ['system', 'reduced', 'full']" :key="mode" @click="settings.motionMode = mode" class="relative w-14 py-1.5 text-[9px] uppercase tracking-wider transition-all group">
+              <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.motionMode === mode ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
+                <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1);"></div>
+              </div>
+              <span class="relative z-10 transition-colors" :class="settings.motionMode === mode ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">{{ mode }}</span>
+            </button>
+          </div>
+        </div>
+        <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0 :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
 
         <!-- Custom Time Atmosphere Toggle -->
         <div class="flex justify-between items-center transition-opacity duration-300" :class="(settings.themeMode === 'realtime' || settings.darkMode) ? 'opacity-40 pointer-events-none' : ''">
