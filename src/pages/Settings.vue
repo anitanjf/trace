@@ -172,7 +172,7 @@ const toggleTimeAtmosphere = () => {
             </button>
           </div>
         </div>
-        <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0 :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
+        <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
 
         <!-- Custom Time Atmosphere Toggle -->
         <div class="flex justify-between items-center transition-opacity duration-300" :class="(settings.themeMode === 'realtime' || settings.darkMode) ? 'opacity-40 pointer-events-none' : ''">
