@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { settings } from '../store'
+import { settings, shouldReduceMotion } from '../store'
 import SplashScreen from './SplashScreen.vue'
 
 const props = defineProps({ 
@@ -27,7 +27,6 @@ const sessionMistakes = ref(0)
 const sessionStartTime = ref(null)
 const sessionEndTime = ref(null)
 const pauseStartTime = ref(0) 
-const isShaking = ref(false)
 const liveWPM = ref(0)
 const isTypingActive = ref(false)
 let typingTimeout = null
@@ -266,7 +265,7 @@ const processCharacter = (char) => {
   userInputs.value.push(char)
 
   if (char === expectedChar) {
-    if (char !== ' ') {
+    if (char !== ' ' && !shouldReduceMotion()) {
       const sparkId = Date.now() + Math.random()
       keystrokeSparks.value.push({ id: sparkId, x: cursorAbsoluteX.value, y: cursorAbsoluteY.value, rotation: Math.random() * 360 })
       schedule(() => { keystrokeSparks.value = keystrokeSparks.value.filter(s => s.id !== sparkId) }, 400)
@@ -288,8 +287,6 @@ const processCharacter = (char) => {
       const cleanWord = currentWord.toLowerCase().replace(/[^\w\s']/g, "")
       if (cleanWord.length > 0) missedWords.value.add(cleanWord)
     }
-    isShaking.value = true
-    schedule(() => { isShaking.value = false }, 300)
   }
 
   const minutes = getSessionElapsedMinutes()
@@ -484,7 +481,7 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div class="flex flex-col items-center w-full relative" :class="{'animate-shake': isShaking}" ref="typingArea">
+    <div class="flex flex-col items-center w-full relative"  ref="typingArea">
       
       <div class="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         <div v-for="spark in keystrokeSparks" :key="spark.id" class="absolute flex items-center justify-center animate-ink-puff" :style="{ left: `${spark.x}px`, top: `${spark.y}px` }">
@@ -492,7 +489,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="absolute top-0 left-0 z-40 pointer-events-none firefly-glide flex items-center justify-center" :style="fireflyStyle">
+      <div v-if="!shouldReduceMotion()" class="absolute top-0 left-0 z-40 pointer-events-none firefly-glide flex items-center justify-center" :style="fireflyStyle">
         <div class="w-full h-full absolute inset-0 flex items-center justify-center transition-opacity duration-1000" :class="isTransitioning || isSweeping || isEntering ? 'opacity-0' : 'opacity-100'">
             <div class="fireflies-container" :class="{ 'is-idle': !isTypingActive }">
                 <div class="firefly ff-1"></div>
@@ -544,8 +541,8 @@ onBeforeUnmount(() => {
                         c.char === ' ' ? 'w-[0.5em] sm:w-[0.8em]' : '',
                         
                         isTransitioning ? 'opacity-0 blur-md' : 
-                        isSweeping ? 'opacity-0 blur-md translate-x-16 -translate-y-8 scale-110 rotate-[12deg]' : 
-                        isEntering ? 'opacity-0 blur-sm -translate-x-8 translate-y-4 scale-95 -rotate-[6deg]' : 
+                        isSweeping ? (shouldReduceMotion() ? 'opacity-0' : 'opacity-0 blur-md translate-x-16 -translate-y-8 scale-110 rotate-[12deg]') :
+                        isEntering ? (shouldReduceMotion() ? 'opacity-0' : 'opacity-0 blur-sm -translate-x-8 translate-y-4 scale-95 -rotate-[6deg]') : 
                         isKintsugi ? 'opacity-100 blur-0 translate-x-0 translate-y-0 rotate-0 scale-100 ' + (settings?.darkMode ? 'text-stone-200' : 'text-stone-800') : 
                         (!isEntering && !isKintsugi && !isSweeping ? [
                           c.index < typedCount && userInputs[c.index] === c.char ? ( settings?.darkMode ? 'text-stone-100 opacity-100' : 'text-stone-900 opacity-100' ) : '',
