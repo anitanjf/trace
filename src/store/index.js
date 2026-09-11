@@ -76,6 +76,7 @@ const readStoredValue = (key) => {
   if (!raw) return null
   try {
     const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid stored data')
     return parsed?.schemaVersion && parsed?.data ? parsed.data : parsed
   } catch (error) {
     try { localStorage.setItem(`${key}_recovery_backup`, raw) } catch {}
@@ -315,7 +316,8 @@ export const initStore = () => {
   if (savedStats) {
     const parsed = savedStats
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
-    if (parsed.activityGrid === undefined) parsed.activityGrid = {} 
+    if (parsed.activityGrid === undefined) parsed.activityGrid = {}
+    if (!parsed.seasonal || typeof parsed.seasonal !== 'object') parsed.seasonal = getDefaultStats().seasonal 
     if (parsed.passageHistory === undefined) parsed.passageHistory = {}
     if (parsed.sessionLedger === undefined) {
       parsed.sessionLedger = {}
@@ -341,6 +343,7 @@ export const initStore = () => {
       parsed.seasonal[5] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
     }
     stats.value = { ...stats.value, ...parsed }
+    localStorage.setItem('zen_stats', encodeStoredValue(stats.value))
   }
   
   if (savedSettings) {
@@ -356,6 +359,7 @@ export const initStore = () => {
     localPreferences = { ...parsedSettings }
     
     applyAppearancePreference()
+    localStorage.setItem('zen_settings', encodeStoredValue(settings.value))
   }
 
   watch(stats, (newStats) => {
@@ -366,7 +370,7 @@ export const initStore = () => {
     applyAppearancePreference()
     localPreferences = { ...newSettings }
     localStorage.setItem('zen_settings', encodeStoredValue(newSettings))
-    if (currentUser.value) syncSettingsToCloud(currentUser.value.uid, newSettings)
+    if (currentUser.value) syncSettingsToCloud(currentUser.value.uid, newSettings).catch(() => {})
   }, { deep: true })
 
   onAuthStateChanged(auth, async (user) => {
