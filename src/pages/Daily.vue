@@ -95,6 +95,7 @@ const handlePause = () => { gameState.value = 'paused' }
 const handleResume = () => { gameState.value = 'playing' }
 
 const handleCompletion = (results) => {
+  if (!results.sessionId || stats.value.sessionLedger?.[results.sessionId]) return
   attemptsArray.value.push(results)
   const currentS = activeVisualIndex.value
   const countsAsDaily = isFirstCompletionOfDay.value
