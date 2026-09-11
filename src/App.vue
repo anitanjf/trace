@@ -1,11 +1,11 @@
 <script setup>
 import Atmosphere from './components/Atmosphere.vue'
 import ZenLoader from './components/ZenLoader.vue'
-import { isAppReady, settings } from './store'
+import { isAppReady, settings, shouldReduceMotion } from './store'
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center select-none overflow-hidden relative font-ui-serif">
+  <div class="min-h-screen flex flex-col items-center justify-center select-none overflow-hidden relative font-ui-serif" :class="{ 'reduce-motion': shouldReduceMotion() }">
     
     <!-- 1. Atmosphere is ALWAYS rendered instantly using the local cache -->
     <Atmosphere />
@@ -101,4 +101,12 @@ import { isAppReady, settings } from './store'
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .mask-fade-edges { mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent); }
+
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
 </style>
