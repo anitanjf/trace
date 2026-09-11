@@ -1,28 +1,10 @@
 <script setup>
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { settings, currentUser } from '../store'
 import { fontOptions, seasons } from '../utils/constants'
-import AuthModal from '../components/AuthModal.vue'
 
 const router = useRouter()
-const showAuthModal = ref(false)
-
-onMounted(() => {
-  if (!currentUser.value) showAuthModal.value = true
-})
-
-watch(currentUser, (newUser) => {
-  if (newUser) showAuthModal.value = false
-})
-
-const handleModalClose = () => {
-  showAuthModal.value = false
-  if (!currentUser.value) {
-    router.push('/')
-  }
-}
-
 const availableLockedSeasons = computed(() => {
   return seasons.map((season, index) => ({ name: season.name, index }))
 })
@@ -40,33 +22,21 @@ const fontClass = computed(() => {
   }
 })
 
-// --- THEME LOGIC HANDLERS ---
-const setRealtimeMode = () => {
+const appearanceOptions = ['system', 'light', 'dark']
+
+const chooseAppearance = (mode) => {
+  settings.value.appearanceMode = mode
+  const prefersDark = typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  settings.value.darkMode = mode === 'dark' || (mode === 'system' && prefersDark)
+}
+
+const chooseAutomaticAtmosphere = () => {
   settings.value.themeMode = 'realtime'
-  settings.value.darkMode = false
-  settings.value.timeAtmosphere = true
 }
 
-const setLockedMode = () => {
+const chooseSeason = (index) => {
   settings.value.themeMode = 'locked'
-}
-
-const toggleDarkMode = () => {
-  if (settings.value.themeMode === 'realtime') return // Locked in Real-Time
-  
-  settings.value.darkMode = !settings.value.darkMode
-  
-  // If Night Mode turns ON, force Time Atmosphere OFF
-  if (settings.value.darkMode) {
-    settings.value.timeAtmosphere = false
-  }
-}
-
-const toggleTimeAtmosphere = () => {
-  if (settings.value.themeMode === 'realtime') return // Locked in Real-Time
-  if (settings.value.darkMode) return // Locked if Night Mode is already ON
-  
-  settings.value.timeAtmosphere = !settings.value.timeAtmosphere
+  settings.value.lockedSeason = index
 }
 </script>
 
@@ -76,7 +46,6 @@ const toggleTimeAtmosphere = () => {
     
     <div class="w-full flex-1 overflow-y-auto no-scrollbar flex flex-col gap-8 px-4 pb-8 mask-fade-edges pt-4">
       
-      <template v-if="currentUser">
         
         <div class="flex flex-col gap-3">
           <span class="text-[10px] tracking-widest uppercase opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">Typography Style</span>
@@ -97,22 +66,14 @@ const toggleTimeAtmosphere = () => {
           </div>
         </div>
 
-        <!-- Custom Dark Mode Toggle -->
-        <div class="flex justify-between items-center transition-opacity duration-300" :class="settings.themeMode === 'realtime' ? 'opacity-40 pointer-events-none' : ''">
-          <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">Night Mode</span>
-          <div class="flex gap-1">
-            <button @click="settings.darkMode && toggleDarkMode()" class="relative w-14 py-1.5 text-[9px] uppercase tracking-wider transition-all group">
-              <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="!settings.darkMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(-1deg);"></div>
-              </div>
-              <span class="relative z-10 transition-colors" :class="!settings.darkMode ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">Off</span>
-            </button>
-            <button @click="!settings.darkMode && toggleDarkMode()" class="relative w-14 py-1.5 text-[9px] uppercase tracking-wider transition-all group">
-              <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.darkMode ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(1deg);"></div>
-              </div>
-              <span class="relative z-10 transition-colors" :class="settings.darkMode ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">On</span>
-            </button>
+        <!-- Appearance -->
+        <div class="flex flex-col gap-3">
+          <div class="flex flex-col">
+            <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Appearance</span>
+            <span class="text-[10px] uppercase tracking-widest mt-1 opacity-70" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Choose how light and dark colors behave</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <button v-for="mode in appearanceOptions" :key="mode" @click="chooseAppearance(mode)" class="relative min-h-11 px-3 py-2 text-[10px] uppercase tracking-wider rounded-lg transition-colors" :class="settings.appearanceMode === mode ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-400 hover:bg-stone-800/50' : 'text-stone-600 hover:bg-white/50')" :aria-pressed="settings.appearanceMode === mode">{{ mode }}</button>
           </div>
         </div>
 
@@ -174,66 +135,23 @@ const toggleTimeAtmosphere = () => {
         </div>
         <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
 
-        <!-- Custom Time Atmosphere Toggle -->
-        <div class="flex justify-between items-center transition-opacity duration-300" :class="(settings.themeMode === 'realtime' || settings.darkMode) ? 'opacity-40 pointer-events-none' : ''">
-          <div class="flex flex-col">
-            <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">Time-of-Day Vibe</span>
-            <span class="text-[9px] uppercase tracking-widest mt-1 opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">Dynamic Lighting</span>
-          </div>
-          <div class="flex gap-1">
-            <button @click="settings.timeAtmosphere && toggleTimeAtmosphere()" class="relative w-14 py-1.5 text-[9px] uppercase tracking-wider transition-all group">
-              <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="!settings.timeAtmosphere ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(-1deg);"></div>
-              </div>
-              <span class="relative z-10 transition-colors" :class="!settings.timeAtmosphere ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">Off</span>
-            </button>
-            <button @click="!settings.timeAtmosphere && toggleTimeAtmosphere()" class="relative w-14 py-1.5 text-[9px] uppercase tracking-wider transition-all group">
-              <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.timeAtmosphere ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(1deg);"></div>
-              </div>
-              <span class="relative z-10 transition-colors" :class="settings.timeAtmosphere ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">On</span>
-            </button>
-          </div>
-        </div>
-
+        <!-- Atmosphere -->
         <div class="flex flex-col gap-3">
-          <span class="text-[10px] tracking-widest uppercase opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">Theme Style</span>
+          <div class="flex flex-col">
+            <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Atmosphere</span>
+            <span class="text-[10px] uppercase tracking-widest mt-1 opacity-70" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Automatic follows the current season</span>
+          </div>
           <div class="grid grid-cols-2 gap-2">
-            
-            <button @click="setRealtimeMode" class="relative py-2.5 text-[10px] uppercase tracking-wider transition-all group">
-               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.themeMode === 'realtime' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                 <div class="absolute inset-0 rounded-xl" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.15) rotate(-1deg);"></div>
-               </div>
-               <span class="relative z-10 transition-colors" :class="settings.themeMode === 'realtime' ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : (settings.darkMode ? 'text-stone-500' : 'text-stone-600')">Real-Time</span>
-            </button>
-            
-            <button @click="setLockedMode" class="relative py-2.5 text-[10px] uppercase tracking-wider transition-all group">
-               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.themeMode === 'locked' ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                 <div class="absolute inset-0 rounded-xl" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.15) rotate(1deg);"></div>
-               </div>
-               <span class="relative z-10 transition-colors" :class="settings.themeMode === 'locked' ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : (settings.darkMode ? 'text-stone-500' : 'text-stone-600')">Locked Season</span>
-            </button>
-            
+            <button @click="chooseAutomaticAtmosphere" class="min-h-11 px-3 py-2 text-[10px] uppercase tracking-wider rounded-lg transition-colors" :class="settings.themeMode === 'realtime' ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-400 hover:bg-stone-800/50' : 'text-stone-600 hover:bg-white/50')" :aria-pressed="settings.themeMode === 'realtime'">Automatic</button>
+            <button v-for="seasonObj in availableLockedSeasons" :key="seasonObj.index" @click="chooseSeason(seasonObj.index)" class="min-h-11 px-3 py-2 text-[10px] uppercase tracking-wider rounded-lg transition-colors" :class="settings.themeMode === 'locked' && settings.lockedSeason === seasonObj.index ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-400 hover:bg-stone-800/50' : 'text-stone-600 hover:bg-white/50')" :aria-pressed="settings.themeMode === 'locked' && settings.lockedSeason === seasonObj.index">{{ seasonObj.name }}</button>
           </div>
         </div>
-
-        <div v-if="settings.themeMode === 'locked'" class="flex flex-col gap-2 animate-fade-in pt-1 pb-4">
-          <span class="text-[9px] tracking-widest uppercase opacity-60 text-center" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">Select Season</span>
-          <div class="flex flex-wrap justify-center gap-2">
-             <button v-for="seasonObj in availableLockedSeasons" :key="seasonObj.index" @click="settings.lockedSeason = seasonObj.index" class="relative px-4 py-2 text-[9px] uppercase tracking-wider transition-all group">
-               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.lockedSeason === seasonObj.index ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
-                 <div class="absolute inset-0 rounded-xl" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.2) rotate(-1deg);"></div>
-               </div>
-               <span class="relative z-10 transition-colors" :class="settings.lockedSeason === seasonObj.index ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : (settings.darkMode ? 'text-stone-500' : 'text-stone-600')">{{ seasonObj.name }}</span>
-             </button>
-          </div>
-        </div>
-
-      </template>
 
     </div>
 
-    <button v-if="!showAuthModal" @click="router.push('/')" class="relative px-8 py-3 group transition-transform hover:scale-105 mt-12 font-ui-sans">
+    <p class="text-center text-[10px] uppercase tracking-widest opacity-60 px-6" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">{{ currentUser ? 'Preferences sync with your account.' : 'Saved on this device. Sign in to sync across devices.' }}</p>
+
+    <button @click="router.push('/')" class="relative px-8 py-3 group transition-transform hover:scale-105 mt-12 font-ui-sans">
         <div class="absolute inset-0 rounded-full transition-opacity" 
             :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" 
             style="filter: url(#ink-blot);"></div>
@@ -243,6 +161,5 @@ const toggleTimeAtmosphere = () => {
         </span>
     </button>
 
-    <AuthModal v-if="showAuthModal" @close="handleModalClose" />
   </div>
 </template>
