@@ -341,26 +341,24 @@ const triggerCompletion = () => {
   scrollOffset.value = 0
   
   setTimeout(() => {
-    // Universal Animation Trigger!
     isKintsugi.value = false
     isSweeping.value = true
-    
-    // Performance fix: Groups 2 characters together using Math.floor at a 18ms speed.
-    const sweepDuration = (Math.floor(poemCharacters.value.length / 2) * 18) + 1200
-    
+
+    // Preserve the ink sweep without tying the wait to passage length.
+    const sweepDuration = 300
+
     setTimeout(() => {
       isTransitioning.value = true
-      setTimeout(() => { emitStatsData() }, 2500)
+      setTimeout(() => { emitStatsData() }, 150)
     }, sweepDuration)
-    
-  }, 3500)
+  }, 300)
 }
 
 onMounted(() => {
   window.addEventListener('keydown', handleKey, { passive: false })
   window.addEventListener('resize', () => { calculateLines(); updateCursor(); })
   
-  const enterDelay = props.gameMode === 'flow' ? 800 : (props.quote.text.length * 15) + 600
+  const enterDelay = props.gameMode === 'flow' ? 300 : 450
 
   setTimeout(() => { 
     isEntering.value = false; 
