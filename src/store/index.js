@@ -30,6 +30,7 @@ const getDefaultStats = () => ({
 
 const getDefaultSettings = () => ({
   darkMode: false,
+  appearanceMode: 'system',
   fontFamily: 'calligraphy', 
   pureZen: false, 
   showLiveWPM: false,
@@ -49,9 +50,15 @@ export const currentUser = ref(null)
 
 export const isAppReady = ref(false)
 export const systemPrefersReducedMotion = ref(false)
+export const systemPrefersDark = ref(false)
 export const shouldReduceMotion = () =>
   settings.value.motionMode === 'reduced' ||
   (settings.value.motionMode !== 'full' && systemPrefersReducedMotion.value)
+
+export const applyAppearancePreference = () => {
+  settings.value.darkMode = settings.value.appearanceMode === 'dark' ||
+    (settings.value.appearanceMode === 'system' && systemPrefersDark.value)
+}
 
 const syncToCloud = async (uid, currentStats, currentSettings) => {
   try {
@@ -121,10 +128,19 @@ export const initStore = () => {
     const updateMotionPreference = () => { systemPrefersReducedMotion.value = motionQuery.matches }
     updateMotionPreference()
     motionQuery.addEventListener?.('change', updateMotionPreference)
+
+    const appearanceQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const updateAppearancePreference = () => {
+      systemPrefersDark.value = appearanceQuery.matches
+      if (settings.value.appearanceMode === 'system') applyAppearancePreference()
+    }
+    updateAppearancePreference()
+    appearanceQuery.addEventListener?.('change', updateAppearancePreference)
   }
 
   const savedStats = localStorage.getItem('zen_stats')
   const savedSettings = localStorage.getItem('zen_settings')
+  let localPreferences = {}
   
   if (savedStats) {
     const parsed = JSON.parse(savedStats)
@@ -142,19 +158,16 @@ export const initStore = () => {
   if (savedSettings) {
     const parsedSettings = JSON.parse(savedSettings)
     if (parsedSettings.timeAtmosphere === undefined) parsedSettings.timeAtmosphere = true
+    if (!['system', 'light', 'dark'].includes(parsedSettings.appearanceMode)) parsedSettings.appearanceMode = parsedSettings.darkMode ? 'dark' : 'light'
     if (!parsedSettings.themeMode || parsedSettings.themeMode === 'journey') parsedSettings.themeMode = 'realtime'
     if (parsedSettings.lockedSeason === undefined) parsedSettings.lockedSeason = getRealWorldSeason()
     if (!['system', 'reduced', 'full'].includes(parsedSettings.motionMode)) parsedSettings.motionMode = 'system'
     if (parsedSettings.fontFamily === 'serif' || parsedSettings.fontFamily === 'mincho') parsedSettings.fontFamily = 'calligraphy'
     if (parsedSettings.fontFamily === 'sans' || parsedSettings.fontFamily === 'gothic') parsedSettings.fontFamily = 'minimalist'
     settings.value = { ...settings.value, ...parsedSettings }
+    localPreferences = { ...parsedSettings }
     
-    if (settings.value.themeMode === 'realtime') {
-      settings.value.darkMode = false;
-      settings.value.timeAtmosphere = true;
-    } else if (settings.value.darkMode) {
-      settings.value.timeAtmosphere = false;
-    }
+    applyAppearancePreference()
   }
 
   watch(stats, (newStats) => {
@@ -163,6 +176,8 @@ export const initStore = () => {
   }, { deep: true })
 
   watch(settings, (newSettings) => {
+    applyAppearancePreference()
+    localPreferences = { ...newSettings }
     localStorage.setItem('zen_settings', JSON.stringify(newSettings))
     if (currentUser.value) syncToCloud(currentUser.value.uid, stats.value, newSettings)
   }, { deep: true })
@@ -185,13 +200,9 @@ export const initStore = () => {
             stats.value = cloudData.stats
           }
           if (cloudData.settings) {
-            settings.value = cloudData.settings
-            if (settings.value.themeMode === 'realtime') {
-              settings.value.darkMode = false;
-              settings.value.timeAtmosphere = true;
-            } else if (settings.value.darkMode) {
-              settings.value.timeAtmosphere = false;
-            }
+            settings.value = { ...getDefaultSettings(), ...cloudData.settings, ...localPreferences }
+            applyAppearancePreference()
+            await syncToCloud(user.uid, stats.value, settings.value)
           }
         } else {
           await syncToCloud(user.uid, stats.value, settings.value)
@@ -201,9 +212,7 @@ export const initStore = () => {
       }
     } else if (previousUser) {
       stats.value = getDefaultStats()
-      settings.value = getDefaultSettings()
       localStorage.removeItem('zen_stats')
-      localStorage.removeItem('zen_settings')
     }
 
     isAppReady.value = true
