@@ -56,7 +56,7 @@ const chooseSeason = (index) => {
         <div class="flex flex-col gap-3">
           <span class="text-xs tracking-widest uppercase opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">Typography Style</span>
           <div class="flex flex-wrap justify-center gap-2">
-             <button v-for="font in fontOptions" :key="font.id" @click="settings.fontFamily = font.id" class="px-2 w-[30%] relative py-2.5 text-xs uppercase tracking-wider transition-all group">
+             <button v-for="font in fontOptions" :key="font.id" @click="settings.fontFamily = font.id" :aria-pressed="settings.fontFamily === font.id" class="px-2 w-[30%] relative py-2.5 text-xs uppercase tracking-wider transition-all group">
                <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.fontFamily === font.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                  <div class="absolute inset-0 rounded-xl" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.15) rotate(1deg);"></div>
                </div>
@@ -116,13 +116,13 @@ const chooseSeason = (index) => {
             <span class="text-[11px] uppercase tracking-widest mt-1 opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">No Punctuation</span>
           </div>
           <div class="flex gap-1">
-            <button @click="settings.pureZen = false" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
+            <button @click="settings.pureZen = false" :aria-pressed="!settings.pureZen" aria-label="Turn Pure Zen off" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="!settings.pureZen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                 <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(-1deg);"></div>
               </div>
               <span class="relative z-10 transition-colors" :class="!settings.pureZen ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">Off</span>
             </button>
-            <button @click="settings.pureZen = true" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
+            <button @click="settings.pureZen = true" :aria-pressed="settings.pureZen" aria-label="Turn Pure Zen on" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.pureZen ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                 <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(1deg);"></div>
               </div>
@@ -135,13 +135,13 @@ const chooseSeason = (index) => {
         <div class="flex justify-between items-center transition-opacity duration-300">
           <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">Live Speed</span>
           <div class="flex gap-1">
-            <button @click="settings.showLiveWPM = false" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
+            <button @click="settings.showLiveWPM = false" :aria-pressed="!settings.showLiveWPM" aria-label="Hide live typing speed" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="!settings.showLiveWPM ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                 <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(-1deg);"></div>
               </div>
               <span class="relative z-10 transition-colors" :class="!settings.showLiveWPM ? (settings.darkMode ? 'text-stone-100 font-medium' : 'text-stone-900 font-medium') : 'text-stone-500'">Off</span>
             </button>
-            <button @click="settings.showLiveWPM = true" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
+            <button @click="settings.showLiveWPM = true" :aria-pressed="settings.showLiveWPM" aria-label="Show live typing speed" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.showLiveWPM ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                 <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1) rotate(1deg);"></div>
               </div>
@@ -157,7 +157,7 @@ const chooseSeason = (index) => {
             <span class="text-[11px] uppercase tracking-widest mt-1 opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-800'">System, Reduced, or Full</span>
           </div>
           <div class="flex gap-1">
-            <button v-for="mode in ['system', 'reduced', 'full']" :key="mode" @click="settings.motionMode = mode" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
+            <button v-for="mode in ['system', 'reduced', 'full']" :key="mode" @click="settings.motionMode = mode" :aria-pressed="settings.motionMode === mode" :aria-label="`Use ${mode} motion`" class="relative w-14 py-1.5 text-[11px] uppercase tracking-wider transition-all group">
               <div class="absolute inset-0 flex items-center justify-center transition-opacity duration-300 pointer-events-none" :class="settings.motionMode === mode ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'">
                 <div class="absolute inset-0 rounded-lg" :class="settings.darkMode ? 'bg-stone-500/50' : 'bg-stone-300/70'" style="filter: url(#ink-blot); transform: scale(1.1);"></div>
               </div>

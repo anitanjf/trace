@@ -1,11 +1,15 @@
 <script setup>
 import { ref } from 'vue'
+import { useFocusTrap } from '../composables/useFocusTrap'
 import { settings } from '../store'
 import { logInWithGoogle } from '../services/firebase'
 
 const emit = defineEmits(['close'])
 const isAuthenticating = ref(false)
 const authError = ref('')
+const dialogRef = ref(null)
+const closeDialog = () => { if (!isAuthenticating.value) emit('close') }
+useFocusTrap(dialogRef, { onEscape: closeDialog })
 
 const handleGoogleLogin = async () => {
   isAuthenticating.value = true
@@ -26,10 +30,10 @@ const handleGoogleLogin = async () => {
     <!-- Blurred Dark/Light Backdrop -->
     <div class="absolute inset-0 transition-colors duration-1000" 
          :class="settings.darkMode ? 'bg-black/60 backdrop-blur-[2px]' : 'bg-stone-900/30 backdrop-blur-[2px]'" 
-         @click="!isAuthenticating && emit('close')"></div>
+         @click="closeDialog" aria-hidden="true"></div>
 
     <!-- Modal Container -->
-    <div class="relative w-full max-w-sm flex flex-col items-center justify-center p-12 text-center group">
+    <div ref="dialogRef" role="dialog" aria-modal="true" aria-labelledby="auth-dialog-title" tabindex="-1" class="relative w-full max-w-sm flex flex-col items-center justify-center p-12 text-center group">
       
       <!-- Organic Ink-Blot Background Layer -->
       <div class="absolute inset-0 rounded-2xl shadow-xl transition-colors duration-1000" 
@@ -39,7 +43,7 @@ const handleGoogleLogin = async () => {
       <!-- Modal Content -->
       <div class="relative z-10 flex flex-col items-center w-full">
         
-        <h3 class="text-2xl tracking-[0.4em] uppercase font-light mb-6 font-ui-serif" 
+        <h3 id="auth-dialog-title" class="text-2xl tracking-[0.4em] uppercase font-light mb-6 font-ui-serif" 
             :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
           Seeker
         </h3>
@@ -75,7 +79,7 @@ const handleGoogleLogin = async () => {
         <p v-if="authError" class="mb-4 text-[10px] leading-relaxed text-red-600" role="alert">{{ authError }}</p>
 
         <!-- Cancel Text Link -->
-        <button @click="emit('close')" :disabled="isAuthenticating" 
+        <button @click="closeDialog" :disabled="isAuthenticating" aria-label="Close sign-in dialog" 
                 class="text-[9px] tracking-[0.25em] uppercase font-ui-sans transition-colors" 
                 :class="settings.darkMode ? 'text-stone-500 hover:text-stone-300' : 'text-stone-400 hover:text-stone-800'">
           Maybe Later

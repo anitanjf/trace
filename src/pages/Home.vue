@@ -26,7 +26,7 @@ const lifetimeAccuracy = computed(() => {
       <div class="w-12 h-[1px] opacity-30 bg-current my-2"></div>
     </div>
 
-    <div class="flex flex-col items-center gap-3.5 w-full">
+    <nav aria-label="Practice modes" class="flex flex-col items-center gap-3.5 w-full">
       <button @click="router.push('/meditation')" class="relative w-full py-3.5 px-6 group transition-transform hover:scale-[1.02] flex items-center justify-center">
         <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
         <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Begin Meditation</span>
@@ -47,14 +47,14 @@ const lifetimeAccuracy = computed(() => {
         <div class="absolute inset-0 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
         <span class="relative z-10 tracking-[0.25em] uppercase text-xs sm:text-sm font-medium flex items-center gap-2" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-800'">Multiplayer <span class="text-[11px] px-2 py-0.5 rounded-full tracking-normal opacity-70 border font-ui-sans" :class="settings?.darkMode ? 'border-stone-700 bg-stone-900' : 'border-stone-300 bg-white/60'">soon ✦</span></span>
       </button>
-    </div>
+    </nav>
 
-    <div class="flex flex-wrap gap-4 sm:gap-6 justify-center items-center w-full font-ui-sans">
+    <nav aria-label="Account and information" class="flex flex-wrap gap-4 sm:gap-6 justify-center items-center w-full font-ui-sans">
       <button @click="router.push('/profile')" class="relative px-5 py-2 group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-800'">Profile</span></button>
       <button @click="router.push('/archive')" class="relative px-5 py-2 group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-800'">Archive</span></button>
       <button @click="router.push('/settings')" class="relative px-5 py-2 group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-800'">Preferences</span></button>
       <button @click="router.push('/about')" class="relative px-5 py-2 group transition-transform hover:scale-105"><div class="absolute inset-0 rounded-full transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div><span class="relative z-10 tracking-[0.25em] uppercase text-xs" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-800'">About</span></button>
-    </div>
+    </nav>
 
     <div class="flex justify-center gap-12 sm:gap-16 text-xs sm:text-[11px] uppercase tracking-[0.3em] opacity-80 pt-2 font-ui-sans" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-600'">
       <div class="flex flex-col items-center gap-1"><span class="opacity-40">Passages</span><span class="text-xs font-light">{{ stats.lifetimePassages }}</span></div>

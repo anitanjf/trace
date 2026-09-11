@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { settings } from '../store'
+import { useFocusTrap } from '../composables/useFocusTrap'
 
 const props = defineProps({
   mode: { type: String, required: true },
@@ -11,6 +12,9 @@ const props = defineProps({
 const emit = defineEmits(['next', 'menu', 'retry'])
 
 const showFlawlessWarning = ref(false)
+const warningDialogRef = ref(null)
+const closeFlawlessWarning = () => { showFlawlessWarning.value = false }
+useFocusTrap(warningDialogRef, { active: showFlawlessWarning, onEscape: closeFlawlessWarning })
 
 const currentAttempt = computed(() => {
   if (!props.attempts || props.attempts.length === 0) return {}
@@ -150,14 +154,14 @@ const requestRetry = () => {
       <div v-else class="mb-8"></div>
 
       <!-- ACTIONS OR WARNING OVERLAY -->
-      <div v-if="showFlawlessWarning" class="flex flex-col items-center justify-center gap-6 w-full max-w-lg mt-4 animate-fade-in p-6 rounded-lg border border-[#DFBE73]/30 bg-[#DFBE73]/5">
-        <p class="text-sm font-ui-serif text-[#DFBE73] italic">"The water is perfectly still. A flawless reflection needs no further ripples. Do you truly wish to disturb the surface?"</p>
+      <div v-if="showFlawlessWarning" ref="warningDialogRef" role="alertdialog" aria-modal="true" aria-labelledby="retry-warning-title" tabindex="-1" class="flex flex-col items-center justify-center gap-6 w-full max-w-lg mt-4 animate-fade-in p-6 rounded-lg border border-[#DFBE73]/30 bg-[#DFBE73]/5">
+        <p id="retry-warning-title" class="text-sm font-ui-serif text-[#DFBE73] italic">"The water is perfectly still. A flawless reflection needs no further ripples. Do you truly wish to disturb the surface?"</p>
         <div class="flex gap-4 w-full">
-          <button @click="showFlawlessWarning = false" class="relative flex-1 py-3 group transition-transform hover:scale-105">
+          <button @click="closeFlawlessWarning" aria-label="Cancel retry and keep this result" class="relative flex-1 py-3 group transition-transform hover:scale-105">
             <div class="absolute inset-0 rounded-full transition-opacity bg-[#DFBE73] opacity-10 group-hover:opacity-20" style="filter: url(#ink-blot);"></div>
             <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] text-[#DFBE73]">Let It Rest</span>
           </button>
-          <button @click="emit('retry')" class="relative flex-1 py-3 group transition-transform hover:scale-105">
+          <button @click="emit('retry')" aria-label="Retry this passage" class="relative flex-1 py-3 group transition-transform hover:scale-105">
             <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
             <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] opacity-70" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-900'">Disturb the Surface</span>
           </button>
@@ -165,17 +169,17 @@ const requestRetry = () => {
       </div>
 
       <div v-else class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 w-full max-w-lg mt-4">
-        <button @click="requestRetry" class="relative flex-1 py-3 group transition-transform hover:scale-105">
+        <button @click="requestRetry" aria-label="Retry this passage" class="relative flex-1 py-3 group transition-transform hover:scale-105">
           <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-10 group-hover:opacity-20' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
           <span class="relative z-10 tracking-[0.25em] uppercase text-[10px] sm:text-xs font-semibold" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-900'">Retry Passage</span>
         </button>
         
-        <button v-if="props.mode === 'daily'" @click="emit('menu')" class="relative flex-1 py-3 group transition-transform hover:scale-105">
+        <button v-if="props.mode === 'daily'" @click="emit('menu')" aria-label="Return to the main menu" class="relative flex-1 py-3 group transition-transform hover:scale-105">
           <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
           <span class="relative z-10 tracking-[0.25em] uppercase text-[10px] sm:text-xs" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-900'">Return to Menu</span>
         </button>
         
-        <button v-else-if="props.mode === 'flow'" @click="emit('next')" class="relative flex-1 py-3 group transition-transform hover:scale-105">
+        <button v-else-if="props.mode === 'flow'" @click="emit('next')" aria-label="Continue" class="relative flex-1 py-3 group transition-transform hover:scale-105">
           <div class="absolute inset-0 rounded-full transition-opacity bg-[#DFBE73] opacity-20 group-hover:opacity-30" style="filter: url(#ink-blot);"></div>
           <span class="relative z-10 tracking-[0.25em] uppercase text-[10px] sm:text-xs text-[#DFBE73]">Return to Menu</span>
         </button>
