@@ -97,8 +97,9 @@ const handleResume = () => { gameState.value = 'playing' }
 const handleCompletion = (results) => {
   attemptsArray.value.push(results)
   const currentS = activeVisualIndex.value
+  const countsAsDaily = isFirstCompletionOfDay.value
   
-  if (isFirstCompletionOfDay.value) {
+  if (countsAsDaily) {
     stats.value.lifetimeDaily++ 
     stats.value.lastDailyDate = Math.floor(Date.now() / 86400000)
     
@@ -113,7 +114,15 @@ const handleCompletion = (results) => {
   stats.value.seasonal[currentS].keystrokes += results.keystrokes
   stats.value.seasonal[currentS].mistakes += results.mistakes
   
-  recordSession() 
+  recordSession({
+    id: results.sessionId,
+    completedAt: results.completedAt,
+    mode: 'daily',
+    season: currentS,
+    dailyDelta: countsAsDaily ? 1 : 0,
+    keystrokes: results.keystrokes,
+    mistakes: results.mistakes
+  }) 
   checkEnlightenments(results) 
   gameState.value = 'complete'
 }
