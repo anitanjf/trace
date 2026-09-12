@@ -1,35 +1,22 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { settings } from '../store'
-import { seasonInkPalette } from '../utils/constants'
-import { getRealWorldSeason } from '../utils/helpers'
 import { useFocusTrap } from '../composables/useFocusTrap'
+import InkButton from './ui/InkButton.vue'
 
 const props = defineProps({
   title: { type: String, default: 'The River Widens' },
   description: {
     type: String,
     default: 'The space for solitude is currently expanding. Check back soon to share the current with fellow travelers.'
-  }
+  },
+  actionLabel: { type: String, default: '' }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'action'])
 const dialogRef = ref(null)
 const closeDialog = () => emit('close')
 useFocusTrap(dialogRef, { onEscape: closeDialog })
-
-const activeSeasonIndex = computed(() =>
-  settings.value.themeMode === 'locked'
-    ? Number(settings.value.lockedSeason || 0)
-    : getRealWorldSeason()
-)
-const activeSeasonInk = computed(() => {
-  const palette = seasonInkPalette[activeSeasonIndex.value] || seasonInkPalette[0]
-  return {
-    backgroundColor: settings.value.darkMode ? palette.dark : palette.light,
-    color: settings.value.darkMode ? palette.darkText : palette.lightText
-  }
-})
 </script>
 
 <template>
@@ -52,10 +39,10 @@ const activeSeasonInk = computed(() => {
       <div
         class="absolute inset-0 -z-10 rounded-2xl shadow-xl transition-[background-color,opacity] duration-700"
         :class="settings.darkMode ? 'opacity-[0.72]' : 'opacity-[0.62]'"
-        :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(-0.15deg)' }"
+        :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(-0.15deg)' }"
       ></div>
 
-      <div class="relative z-10 flex flex-col items-center w-full" :style="{ color: activeSeasonInk.color }">
+      <div class="relative z-10 flex flex-col items-center w-full" :style="{ color: 'var(--trace-season-contrast)' }">
         <p class="text-[8px] uppercase tracking-[0.35em] opacity-55 mb-3">A note from Trace</p>
         <h3 id="mode-info-title" class="text-xl sm:text-2xl tracking-[0.25em] uppercase font-light mb-6 font-ui-serif">
           {{ props.title }}
@@ -65,17 +52,22 @@ const activeSeasonInk = computed(() => {
           {{ props.description }}
         </p>
 
-        <button
-          @click="closeDialog"
-          aria-label="Close information dialog"
-          class="relative isolate w-full min-h-12 py-3 px-6 group transition-transform duration-300 hover:scale-[1.02] flex items-center justify-center"
-        >
-          <span
-            class="absolute inset-0 -z-10 rounded-full opacity-[0.10] group-hover:opacity-[0.18] transition-opacity duration-500"
-            :style="{ backgroundColor: activeSeasonInk.color, filter: 'url(#ink-blot)' }"
-          ></span>
-          <span class="text-[10px] tracking-[0.2em] uppercase font-semibold font-ui-sans">Close</span>
-        </button>
+        <div class="grid w-full gap-2" :class="props.actionLabel ? 'grid-cols-2' : 'grid-cols-1'">
+          <InkButton
+            v-if="props.actionLabel"
+            variant="primary"
+            block
+            class="text-[10px] tracking-[0.14em] uppercase font-semibold"
+            @click="emit('action')"
+          >{{ props.actionLabel }}</InkButton>
+          <InkButton
+            variant="ghost"
+            block
+            aria-label="Close information dialog"
+            class="text-[10px] tracking-[0.2em] uppercase font-semibold"
+            @click="closeDialog"
+          >Close</InkButton>
+        </div>
       </div>
     </div>
   </div>
