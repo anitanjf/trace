@@ -476,8 +476,9 @@ const emitStatsData = () => {
   
   emit('passage-complete', {
     sessionId,
-    completedAt: Date.now(),
-    wpm, 
+    completedAt: sessionEndTime.value || Date.now(),
+    elapsedMs: Math.max(0, (sessionEndTime.value || Date.now()) - sessionStartTime.value),
+    wpm,
     accuracy, 
     keystrokes: sessionKeystrokes.value, 
     mistakes: sessionMistakes.value, 
