@@ -3,6 +3,9 @@ import Atmosphere from './components/Atmosphere.vue'
 import ZenLoader from './components/ZenLoader.vue'
 import SyncStatus from './components/SyncStatus.vue'
 import { isAppReady, settings, shouldReduceMotion } from './store'
+import { useAppAudio } from './composables/useAudio'
+
+useAppAudio()
 </script>
 
 <template>
