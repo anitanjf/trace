@@ -41,6 +41,10 @@ const getDefaultSettings = () => ({
   themeMode: 'realtime',      
   lockedSeason: getRealWorldSeason(),
   motionMode: 'system',
+  ambienceMode: 'off',
+  ambientVolume: 0.35,
+  keystrokeSound: false,
+  keystrokeVolume: 0.3,
   showAtmosphereEffects: true,
   showCursorEffects: true,
   showKeystrokeEffects: true,
@@ -361,6 +365,10 @@ export const initStore = () => {
     if (!parsedSettings.themeMode || parsedSettings.themeMode === 'journey') parsedSettings.themeMode = 'realtime'
     if (parsedSettings.lockedSeason === undefined) parsedSettings.lockedSeason = getRealWorldSeason()
     if (!['system', 'reduced', 'full'].includes(parsedSettings.motionMode)) parsedSettings.motionMode = 'system'
+    if (!['off', 'rain', 'room'].includes(parsedSettings.ambienceMode)) parsedSettings.ambienceMode = 'off'
+    parsedSettings.ambientVolume = Math.min(1, Math.max(0, Number(parsedSettings.ambientVolume ?? 0.35)))
+    parsedSettings.keystrokeSound = Boolean(parsedSettings.keystrokeSound)
+    parsedSettings.keystrokeVolume = Math.min(1, Math.max(0, Number(parsedSettings.keystrokeVolume ?? 0.3)))
     if (!['small', 'medium', 'large'].includes(parsedSettings.textSize)) parsedSettings.textSize = 'medium'
     if (!['compact', 'comfortable', 'spacious'].includes(parsedSettings.lineSpacing)) parsedSettings.lineSpacing = 'comfortable'
     if (!['left', 'center'].includes(parsedSettings.textAlignment)) parsedSettings.textAlignment = 'center'
