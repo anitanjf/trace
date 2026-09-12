@@ -215,7 +215,8 @@ const updateMultiplayerFireflies = async () => {
       name: player.name,
       connected: player.connected !== false,
       transform: `translate(${x}px, ${y}px)`,
-      color: playerFireflyColor(player.seat)
+      color: playerFireflyColor(player.seat),
+      animationVariant: (index % 3) + 1
     }
   })
 }
@@ -682,7 +683,10 @@ onBeforeUnmount(() => {
         aria-hidden="true"
       >
         <span class="multiplayer-firefly-label">{{ player.seat === props.localSeat ? 'You' : player.name }}</span>
-        <span class="player-race-firefly"></span>
+        <span
+          class="firefly multiplayer-racer-firefly"
+          :class="`race-ff-${player.animationVariant}`"
+        ></span>
       </div>
 
       <input
@@ -769,16 +773,17 @@ onBeforeUnmount(() => {
 .mobile-capture-input:focus-visible { outline: none; }
 .cursor-glide { transition: transform 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out; }
 .firefly-glide { transition: transform 1.5s cubic-bezier(0.2, 1, 0.4, 1), opacity 0.5s ease; will-change: transform; }
-.multiplayer-firefly-glide { transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .4s ease; will-change: transform; }
-.multiplayer-firefly-label { position: absolute; left: .7rem; top: -.45rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .72; }
-.player-race-firefly { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; color: var(--multiplayer-firefly-color); background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: multiplayer-race-glow 2.2s ease-in-out infinite; }
-.player-race-firefly::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; background: currentColor; opacity: .12; filter: blur(3px); }
+.multiplayer-firefly-glide { transition: transform .72s cubic-bezier(.2,.8,.2,1), opacity .4s ease; will-change: transform; }
+.multiplayer-firefly-label { position: absolute; left: 1.1rem; top: -.5rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .68; }
+.multiplayer-racer-firefly { color: var(--multiplayer-firefly-color); }
+.multiplayer-racer-firefly.race-ff-1 { animation: orbit1 3.5s infinite linear; }
+.multiplayer-racer-firefly.race-ff-2 { animation: orbit2 4.5s infinite linear reverse; }
+.multiplayer-racer-firefly.race-ff-3 { animation: orbit3 5.5s infinite linear; }
 .fireflies-container { position: absolute; width: 0; height: 0; color: var(--multiplayer-firefly-color, #fef08a); }
 .firefly { position: absolute; width: 4px; height: 4px; margin-top: -2px; margin-left: -2px; border-radius: 50%; pointer-events: none; }
 .firefly::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: flash 3s ease infinite alternate; }
 
 @keyframes flash { 0%, 20%, 100% { opacity: 0.3; box-shadow: 0 0 3px 1px currentColor; } 50% { opacity: 1; box-shadow: 0 0 12px 5px currentColor; } }
-@keyframes multiplayer-race-glow { 0%, 100% { opacity: .45; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.2); } }
 .fireflies-container:not(.is-idle) .ff-1 { animation: roam1 9s infinite; }
 .fireflies-container:not(.is-idle) .ff-2 { animation: roam2 12s infinite reverse; }
 .fireflies-container:not(.is-idle) .ff-3 { animation: roam3 15s infinite; }
@@ -801,6 +806,6 @@ onBeforeUnmount(() => {
 .animate-ink-puff { animation: ink-puff 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @media (prefers-reduced-motion: reduce) {
   .multiplayer-firefly-glide, .firefly-glide { transition: none; }
-  .firefly::before, .fireflies-container .firefly, .player-race-firefly { animation: none !important; }
+  .firefly::before, .fireflies-container .firefly, .multiplayer-racer-firefly { animation: none !important; }
 }
 </style>
