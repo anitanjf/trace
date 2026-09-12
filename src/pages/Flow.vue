@@ -5,7 +5,7 @@ import TypingBoard from '../components/TypingBoard.vue'
 import CompletionStats from '../components/CompletionStats.vue'
 import AuthModal from '../components/AuthModal.vue'
 import PassageLoader from '../components/PassageLoader.vue'
-import { settings, currentUser } from '../store'
+import { stats, settings, currentUser, recordSession, savePassageHistory, checkEnlightenments } from '../store'
 import { seasons } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 import { fetchPassages } from '../services/api' // <-- Bring in your API!
@@ -19,6 +19,11 @@ const attemptsArray = ref([])
 const generatedQuote = ref(null)
 const selectedWordCount = ref(50)
 const sourceQuotes = ref([]) // Holds the real quotes
+const flowRunId = ref(null)
+const isFirstCompletionOfFlow = ref(true)
+
+const createFlowRunId = () =>
+  globalThis.crypto?.randomUUID?.() || `flow-${Date.now()}-${Math.random().toString(36).slice(2)}`
 
 const activeVisualIndex = computed(() => settings.value.themeMode === 'locked' ? (settings.value.lockedSeason || 0) : getRealWorldSeason())
 const activeSeason = computed(() => seasons[activeVisualIndex.value] || seasons[0])
@@ -62,14 +67,15 @@ const startFlow = (count) => {
   selectedWordCount.value = count
   generatedQuote.value = generatePassage(count)
   attemptsArray.value = []
+  flowRunId.value = createFlowRunId()
+  isFirstCompletionOfFlow.value = true
   boardKey.value++
   gameState.value = 'playing'
 }
 
 const handleRestartFromPause = () => {
-  generatedQuote.value = generatePassage(selectedWordCount.value)
   gameState.value = 'playing'
-  boardKey.value++ 
+  boardKey.value++
 }
 
 const handleGlobalKey = (e) => {
@@ -82,14 +88,60 @@ const handlePause = () => { gameState.value = 'paused' }
 const handleResume = () => { gameState.value = 'playing' }
 
 const handleCompletion = (results) => {
-  attemptsArray.value.push(results)
+  if (!results.sessionId || stats.value.sessionLedger?.[results.sessionId]) return
+
+  const currentSeason = activeVisualIndex.value
+  const countsAsPassage = isFirstCompletionOfFlow.value
+  const attempt = {
+    ...results,
+    mode: 'flow',
+    flowRunId: flowRunId.value,
+    wordCount: selectedWordCount.value
+  }
+
+  attemptsArray.value.push(attempt)
+
+  if (!stats.value.seasonal[currentSeason]) {
+    stats.value.seasonal[currentSeason] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
+  }
+
+  if (countsAsPassage) {
+    stats.value.lifetimePassages++
+    stats.value.seasonal[currentSeason].passages++
+    isFirstCompletionOfFlow.value = false
+  }
+
+  stats.value.lifetimeKeystrokes += results.keystrokes
+  stats.value.lifetimeMistakes += results.mistakes
+  stats.value.seasonal[currentSeason].keystrokes += results.keystrokes
+  stats.value.seasonal[currentSeason].mistakes += results.mistakes
+
+  recordSession({
+    id: results.sessionId,
+    completedAt: results.completedAt,
+    elapsedMs: results.elapsedMs,
+    mode: 'flow',
+    season: currentSeason,
+    passageId: flowRunId.value,
+    wordCount: selectedWordCount.value,
+    passageDelta: countsAsPassage ? 1 : 0,
+    keystrokes: results.keystrokes,
+    mistakes: results.mistakes,
+    accuracy: results.accuracy,
+    wpm: results.wpm
+  })
+
+  savePassageHistory(
+    `season_${currentSeason}_flow_${flowRunId.value}`,
+    [...attemptsArray.value]
+  )
+  checkEnlightenments(results)
   gameState.value = 'complete'
 }
 
 const handleRetry = () => {
-  generatedQuote.value = generatePassage(selectedWordCount.value)
   gameState.value = 'playing'
-  boardKey.value++ 
+  boardKey.value++
 }
 </script>
 

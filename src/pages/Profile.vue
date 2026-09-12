@@ -106,16 +106,33 @@ const seasonalPassageHistory = computed(() => {
   return Object.entries(stats.value.passageHistory)
     .filter(([key]) => key.startsWith(prefix))
     .map(([key, attempts]) => {
-      const num = key.split('_passage_')[1]
-      return { id: key, number: num, attempts }
+      const passageNumber = key.split('_passage_')[1]
+      const isFlow = key.includes('_flow_')
+      const latestAttempt = attempts[attempts.length - 1]
+      const wordCount = latestAttempt?.wordCount || 0
+      return {
+        id: key,
+        number: passageNumber || wordCount || 'Flow',
+        label: isFlow ? `Flow · ${wordCount} words` : `Passage ${passageNumber}`,
+        mode: isFlow ? 'flow' : (latestAttempt?.mode || 'meditation'),
+        attempts,
+        completedAt: latestAttempt?.completedAt || 0
+      }
     })
-    .sort((a, b) => parseInt(b.number) - parseInt(a.number)) 
+    .sort((a, b) =>
+      b.completedAt - a.completedAt ||
+      (Number.parseInt(b.number, 10) || 0) - (Number.parseInt(a.number, 10) || 0)
+    ) 
 })
 
 const filteredPassages = computed(() => {
   if (!searchQuery.value.trim()) return [] 
   const query = searchQuery.value.trim().toLowerCase()
-  return seasonalPassageHistory.value.filter(p => p.number.toString().includes(query))
+  return seasonalPassageHistory.value.filter(p =>
+    p.number.toString().toLowerCase().includes(query) ||
+    p.label.toLowerCase().includes(query) ||
+    p.mode.includes(query)
+  )
 })
 
 const getSeasonAverages = computed(() => {
@@ -379,7 +396,7 @@ const radarData = computed(() => {
                            <div class="flex items-baseline gap-4 text-left">
                              <span class="font-ui-serif text-base sm:text-lg tracking-wide transition-opacity duration-500" 
                                    :class="settings.darkMode ? 'text-stone-200 group-hover:text-stone-100' : 'text-stone-700 group-hover:text-stone-900'">
-                               Passage {{ passage.number }}
+                               {{ passage.label }}
                              </span>
                              <span class="text-[6px] sm:text-[7px] uppercase tracking-[0.3em] transition-opacity duration-500 font-semibold"
                                    :class="settings.darkMode ? 'opacity-30 group-hover:opacity-60' : 'opacity-40 group-hover:opacity-70'">
