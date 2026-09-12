@@ -70,7 +70,7 @@ const lifetimeAccuracy = computed(() => {
     <!-- POETIC MOBILE INDICATOR -->
     <div class="block sm:hidden text-center mt-12 px-6">
       <p class="text-xs uppercase tracking-widest leading-relaxed opacity-50 font-ui-sans" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-500'">
-        A tactile canvas invites deeper stillness.<br>This sanctuary is best traversed with a physical keyboard.
+        Tap the passage to open your keyboard.<br>Rotate your device if you need more room.
       </p>
     </div>
 
