@@ -155,7 +155,7 @@ const playSeasonAccent = layer => {
   }
 }
 
-const seasonalLevel = profile => Math.max(clamp(settings.value.ambientVolume) * profile.level, 0.0001)
+const seasonalLevel = () => Math.max(clamp(settings.value.ambientVolume), 0.0001)
 
 const startSeasonal = () => {
   const context = getAudioContext()
@@ -166,6 +166,7 @@ const startSeasonal = () => {
   const source = context.createBufferSource()
   const filter = context.createBiquadFilter()
   const output = context.createGain()
+  const baseGain = context.createGain()
   const drift = context.createOscillator()
   const driftDepth = context.createGain()
 
@@ -175,15 +176,17 @@ const startSeasonal = () => {
   filter.frequency.value = profile.frequency
   filter.Q.value = profile.q
 
-  const level = seasonalLevel(profile)
+  const level = seasonalLevel()
   output.gain.setValueAtTime(0.0001, context.currentTime)
   output.gain.exponentialRampToValueAtTime(level, context.currentTime + 0.7)
+  baseGain.gain.value = profile.level
   drift.type = 'sine'
   drift.frequency.value = profile.drift
-  driftDepth.gain.value = level * 0.16
+  driftDepth.gain.value = profile.level * 0.16
 
   source.connect(filter)
-  filter.connect(output)
+  filter.connect(baseGain)
+  baseGain.connect(output)
   drift.connect(driftDepth)
   driftDepth.connect(output.gain)
   output.connect(context.destination)
@@ -319,7 +322,7 @@ const syncBackgroundAudio = () => {
   const playSeason = backgroundAudioAllowed() && settings.value.seasonalAmbience && clamp(settings.value.ambientVolume) > 0
   if (!playSeason) stopSeasonal()
   else if (!seasonalLayer || seasonalLayer.profile !== seasonProfile.name) startSeasonal()
-  else seasonalLayer.output.gain.setTargetAtTime(seasonalLevel(seasonProfile), audioContext.currentTime, 0.08)
+  else seasonalLayer.output.gain.setTargetAtTime(seasonalLevel(), audioContext.currentTime, 0.08)
 
   const trackName = settings.value.lofiTrack
   const playLofi = backgroundAudioAllowed() && trackName !== 'off' && clamp(settings.value.lofiVolume) > 0
