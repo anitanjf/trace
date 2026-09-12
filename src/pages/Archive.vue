@@ -241,7 +241,7 @@ const handleModalClose = () => {
 
         <div v-if="archiveError" class="relative isolate mb-6 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4" role="alert">
           <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-xl bg-red-500 opacity-[0.08]" style="filter: url(#ink-blot);"></span>
-          <p class="text-xs text-red-700 dark:text-red-300">{{ archiveError }}</p>
+          <p class="text-xs" :class="settings.darkMode ? 'text-red-300' : 'text-red-700'">{{ archiveError }}</p>
           <button @click="fetchArchivedQuotes" class="min-h-11 px-4 text-[9px] uppercase tracking-widest">Try again</button>
         </div>
 
@@ -289,7 +289,7 @@ const handleModalClose = () => {
                   v-else
                   @click="removeQuote(quote)"
                   :disabled="removingId === quote.id"
-                  class="relative isolate min-h-12 px-4 text-[9px] uppercase tracking-[0.14em] text-red-700 dark:text-red-300 disabled:opacity-40"
+                  class="relative isolate min-h-12 px-4 text-[9px] uppercase tracking-[0.14em] disabled:opacity-40" :class="settings.darkMode ? 'text-red-300' : 'text-red-700'"
                 >
                   <span class="absolute inset-0 -z-10 rounded-full bg-red-500 opacity-[0.08]" style="filter: url(#ink-blot);"></span>
                   {{ removingId === quote.id ? 'Releasing…' : 'Confirm removal' }}
