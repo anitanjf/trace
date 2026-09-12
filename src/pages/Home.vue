@@ -38,7 +38,7 @@ const lifetimeAccuracy = computed(() => {
         </div>
       </button>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <button aria-describedby="daily-description" @click="router.push('/daily')" class="relative isolate min-h-28 p-5 text-left group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.2deg);"></div>
           <span class="relative z-10 block text-sm tracking-[0.2em] uppercase font-ui-serif mb-2" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</span>
@@ -48,6 +48,14 @@ const lifetimeAccuracy = computed(() => {
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(-0.2deg);"></div>
           <span class="relative z-10 block text-sm tracking-[0.2em] uppercase font-ui-serif mb-2" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</span>
           <span id="flow-description" class="relative z-10 block text-xs leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">Choose 50, 100, or 200 words for a continuous punctuation-free session.</span>
+        </button>
+        <button aria-describedby="multiplayer-description" @click="showMultiplayerModal = true" class="relative isolate min-h-28 p-5 text-left group">
+          <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.15deg);"></div>
+          <span class="relative z-10 flex items-center gap-2 mb-2">
+            <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
+            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans" :class="settings?.darkMode ? 'border-stone-600 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">Soon</span>
+          </span>
+          <span id="multiplayer-description" class="relative z-10 block text-xs leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">A quiet shared typing experience is being prepared.</span>
         </button>
       </div>
     </section>
@@ -72,11 +80,6 @@ const lifetimeAccuracy = computed(() => {
           <span class="relative z-10" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-800'">About</span>
         </button>
       </nav>
-      <button @click="showMultiplayerModal = true" class="relative mt-3 mx-auto min-h-11 px-5 flex items-center gap-2 rounded-full text-[9px] uppercase tracking-[0.18em] group font-ui-sans">
-        <div class="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" :class="settings?.darkMode ? 'bg-white/5' : 'bg-stone-300/60'" style="filter: url(#ink-blot);"></div>
-        <span class="relative z-10" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">Multiplayer</span>
-        <span class="relative z-10 px-2 py-0.5 rounded-full border text-[8px] tracking-normal" :class="settings?.darkMode ? 'border-stone-700 text-stone-400' : 'border-stone-400 text-stone-700'">Soon</span>
-      </button>
     </section>
 
     <footer class="flex flex-col items-center gap-3">
