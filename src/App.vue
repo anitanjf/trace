@@ -6,14 +6,14 @@ import { isAppReady, settings, shouldReduceMotion } from './store'
 </script>
 
 <template>
-  <div class="min-h-screen flex flex-col items-center justify-center select-none overflow-hidden relative font-ui-serif" :class="{ 'reduce-motion': shouldReduceMotion() }">
+  <div class="min-h-[100dvh] flex flex-col items-center justify-center select-none overflow-x-hidden overflow-y-auto relative font-ui-serif" :class="{ 'reduce-motion': shouldReduceMotion() }">
     
     <!-- 1. Atmosphere is ALWAYS rendered instantly using the local cache -->
     <Atmosphere />
 
     <transition name="splash-fade">
       <!-- 2. The Main App (Revealed when Firebase finishes loading) -->
-      <div v-if="isAppReady" class="w-full h-full flex flex-col items-center justify-center absolute inset-0 z-10">
+      <div v-if="isAppReady" class="w-full min-h-[100dvh] flex flex-col items-center justify-center absolute inset-0 z-10 overflow-x-hidden overflow-y-auto">
         <router-view :key="$route.fullPath"></router-view>
       </div>
 
