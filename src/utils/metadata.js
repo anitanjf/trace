@@ -17,6 +17,10 @@ const routeMetadata = {
     title: 'Flow State — Trace',
     description: 'Settle into a continuous punctuation-free typing practice for calm concentration.'
   },
+  QuietMultiplayer: {
+    title: 'Quiet Room Prototype — Trace',
+    description: 'Explore a private, non-competitive two-person typing presence without sharing typed text.'
+  },
   Archive: {
     title: 'Archive — Trace',
     description: 'Find, revisit, and practice the reflections you chose to preserve.'

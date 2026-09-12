@@ -19,11 +19,17 @@ const modeDetails = {
   },
   multiplayer: {
     title: 'Multiplayer',
-    description: 'A quiet shared typing experience is being prepared. Check back soon to practice with fellow travelers.'
+    description: 'Try a private two-person room where both travelers type the same passage at their own pace. Only anonymous presence and progress marks are shared.',
+    actionLabel: 'Open prototype'
   }
 }
 
 const openModeInfo = mode => { activeModeInfo.value = modeDetails[mode] }
+const handleModeAction = () => {
+  const isMultiplayer = activeModeInfo.value === modeDetails.multiplayer
+  activeModeInfo.value = null
+  if (isMultiplayer) router.push('/multiplayer')
+}
 
 const lifetimeAccuracy = computed(() => {
   if (stats.value.lifetimeKeystrokes === 0) return null
@@ -81,7 +87,7 @@ const lifetimeAccuracy = computed(() => {
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.26] group-hover:opacity-[0.36]' : 'opacity-[0.20] group-hover:opacity-[0.30]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.1deg) scaleX(1.002)' }"></div>
           <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-11 w-full pr-12 flex items-center gap-2 text-left">
             <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">Soon</span>
+            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">Prototype</span>
           </button>
           <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
             <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px] opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">i</span>
@@ -113,6 +119,8 @@ const lifetimeAccuracy = computed(() => {
     v-if="activeModeInfo"
     :title="activeModeInfo.title"
     :description="activeModeInfo.description"
+    :action-label="activeModeInfo.actionLabel"
     @close="activeModeInfo = null"
+    @action="handleModeAction"
   />
 </template>
