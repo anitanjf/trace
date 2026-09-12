@@ -55,32 +55,32 @@ const lifetimeAccuracy = computed(() => {
         </div>
       </button>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="relative isolate min-h-20 p-4 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.2deg);"></div>
-          <div class="relative z-10 min-h-12 flex items-center gap-2">
-            <button @click="router.push('/daily')" class="min-h-11 flex-1 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</button>
-            <button @click="openModeInfo('daily')" type="button" aria-label="About Daily Reflection" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
-          </div>
+          <button @click="router.push('/daily')" class="relative z-10 min-h-12 w-full pr-12 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</button>
+          <button @click="openModeInfo('daily')" type="button" aria-label="About Daily Reflection" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
+            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px]" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">i</span>
+          </button>
         </div>
 
         <div class="relative isolate min-h-20 p-4 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(-0.2deg);"></div>
-          <div class="relative z-10 min-h-12 flex items-center gap-2">
-            <button @click="router.push('/flow')" class="min-h-11 flex-1 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</button>
-            <button @click="openModeInfo('flow')" type="button" aria-label="About Flow State" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
-          </div>
+          <button @click="router.push('/flow')" class="relative z-10 min-h-12 w-full pr-12 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</button>
+          <button @click="openModeInfo('flow')" type="button" aria-label="About Flow State" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
+            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px]" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">i</span>
+          </button>
         </div>
 
-        <div class="relative isolate min-h-20 p-4 group">
-          <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.15deg);"></div>
-          <div class="relative z-10 min-h-12 flex items-center gap-2">
-            <button @click="openModeInfo('multiplayer')" class="min-h-11 flex-1 flex items-center gap-2 text-left">
-              <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-              <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans" :class="settings?.darkMode ? 'border-stone-600 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">Soon</span>
-            </button>
-            <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
-          </div>
+        <div class="relative isolate min-h-16 p-4 sm:col-span-2 group">
+          <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.1deg) scaleX(1.002);"></div>
+          <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-11 w-full pr-12 flex items-center gap-2 text-left">
+            <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
+            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans" :class="settings?.darkMode ? 'border-stone-600 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">Soon</span>
+          </button>
+          <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
+            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px]" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">i</span>
+          </button>
         </div>
       </div>
     </section>
