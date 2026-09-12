@@ -99,13 +99,21 @@ const syncAmbient = () => {
   ambientNodes.gain.gain.setTargetAtTime(Math.max(ambientLevel(), 0.0001), now, 0.05)
 }
 
+const removeUnlockListeners = () => {
+  window.removeEventListener('pointerdown', unlockAudio, { capture: true })
+  window.removeEventListener('keydown', unlockAudio, { capture: true })
+}
+
 const unlockAudio = async () => {
   const context = getAudioContext()
   if (!context) return
   try {
     if (context.state === 'suspended') await context.resume()
     audioUnlocked = context.state === 'running'
-    if (audioUnlocked) syncAmbient()
+    if (audioUnlocked) {
+      removeUnlockListeners()
+      syncAmbient()
+    }
   } catch {
     audioUnlocked = false
   }
@@ -169,8 +177,10 @@ export const useAppAudio = () => {
   }
 
   onMounted(() => {
-    window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true })
-    window.addEventListener('keydown', unlockAudio, { capture: true })
+    if (!audioUnlocked) {
+      window.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true })
+      window.addEventListener('keydown', unlockAudio, { capture: true })
+    }
     document.addEventListener('visibilitychange', handleVisibility)
   })
 
@@ -182,8 +192,7 @@ export const useAppAudio = () => {
   )
 
   onBeforeUnmount(() => {
-    window.removeEventListener('pointerdown', unlockAudio, { capture: true })
-    window.removeEventListener('keydown', unlockAudio, { capture: true })
+    removeUnlockListeners()
     document.removeEventListener('visibilitychange', handleVisibility)
     stopAmbient(0.02)
   })
