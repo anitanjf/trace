@@ -23,7 +23,7 @@ Typed text, individual keystrokes, display names, email addresses, WPM, accuracy
 4. Each traveler atomically claims one of two fixed anonymous slots, so the database structure itself enforces room capacity without counting children in rules.
 5. A private claim lets each traveler update only their own public presence slot without exposing their account identity to the other participant.
 6. Each client registers `onDisconnect` removal for both records before joining.
-7. Progress writes are throttled, while a heartbeat keeps presence current.
+7. Progress writes are throttled, while a heartbeat keeps presence current. A slot without a fresh heartbeat for 24 seconds may be reclaimed.
 8. A remaining traveler may continue alone through a disconnect.
 9. Expired rooms become unreadable and unwritable under the database rules.
 

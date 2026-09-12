@@ -52,7 +52,7 @@
         "claims": {
           "$slot": {
             ".read": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid)",
-            ".write": "auth != null && ($slot === 'one' || $slot === 'two') && root.child('quietRooms').child($roomId).child('meta').child('expiresAt').val() > now && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.child('uid').val() === auth.uid && (!newData.exists() || (newData.child('uid').val() === auth.uid && newData.child('clientId').val() === data.child('clientId').val()))))",
+            ".write": "auth != null && ($slot === 'one' || $slot === 'two') && root.child('quietRooms').child($roomId).child('meta').child('expiresAt').val() > now && ((!newData.exists() && data.exists() && data.child('uid').val() === auth.uid) || (newData.exists() && newData.child('uid').val() === auth.uid && (!data.exists() || (data.child('uid').val() === auth.uid && newData.child('clientId').val() === data.child('clientId').val()) || !root.child('quietRooms').child($roomId).child('members').child($slot).child('lastSeen').isNumber() || root.child('quietRooms').child($roomId).child('members').child($slot).child('lastSeen').val() < now - 24000)))",
             ".validate": "!newData.exists() || newData.hasChildren(['uid', 'clientId'])",
             "uid": {
               ".validate": "newData.isString() && newData.val() === auth.uid"
