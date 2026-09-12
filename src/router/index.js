@@ -7,6 +7,7 @@ import Settings from '../pages/Settings.vue'
 import About from '../pages/About.vue'
 import Profile from '../pages/Profile.vue'
 import Flow from '../pages/Flow.vue'
+import { applyRouteMetadata } from '../utils/metadata'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
@@ -16,12 +17,16 @@ const routes = [
   { path: '/settings', name: 'Settings', component: Settings },
   { path: '/about', name: 'About', component: About },
   { path: '/profile', name: 'Profile', component: Profile },
-  { path: '/flow', component: Flow }
+  { path: '/flow', name: 'Flow', component: Flow }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+router.afterEach(to => {
+  applyRouteMetadata(to)
 })
 
 export default router
