@@ -39,6 +39,25 @@ const seasonSoundNotes = [
   'Steady rain · water drops'
 ]
 const activeSeasonSound = computed(() => seasonSoundNotes[activeSeasonIndex.value] || seasonSoundNotes[0])
+const seasonInkPalette = [
+  { light: '#E7C3C8', dark: '#65484D', lightText: '#2C1D20', darkText: '#FAF8F5' },
+  { light: '#CCDAB8', dark: '#46533C', lightText: '#25301F', darkText: '#FAF8F5' },
+  { light: '#C9AA8D', dark: '#654B38', lightText: '#302219', darkText: '#FAF8F5' },
+  { light: '#CBD9E2', dark: '#465867', lightText: '#1F2933', darkText: '#FAF8F5' },
+  { light: '#D8C893', dark: '#62573A', lightText: '#2D271A', darkText: '#FAF8F5' },
+  { light: '#8FA7C2', dark: '#44556C', lightText: '#17202B', darkText: '#FAF8F5' }
+]
+const activeSeasonInk = computed(() => {
+  const palette = seasonInkPalette[activeSeasonIndex.value] || seasonInkPalette[0]
+  return {
+    backgroundColor: settings.value.darkMode ? palette.dark : palette.light,
+    color: settings.value.darkMode ? palette.darkText : palette.lightText
+  }
+})
+const selectedSectionBackground = sectionId =>
+  activeSection.value === sectionId ? { backgroundColor: activeSeasonInk.value.backgroundColor } : undefined
+const selectedSectionText = sectionId =>
+  activeSection.value === sectionId ? { color: activeSeasonInk.value.color } : undefined
 const availableLockedSeasons = computed(() => seasons.map((season, index) => ({ name: season.name, index })))
 
 const fontClass = computed(() => {
@@ -88,9 +107,21 @@ const chooseSeason = index => {
     <div class="flex flex-col sm:flex-row gap-6 sm:gap-10 min-h-0 flex-1">
       <nav aria-label="Preference groups" class="grid grid-cols-3 sm:flex sm:flex-col gap-2 sm:w-44 flex-shrink-0">
         <button v-for="section in sections" :key="section.id" @click="activeSection = section.id" :aria-pressed="activeSection === section.id" class="relative isolate min-h-14 sm:min-h-16 px-3 sm:px-5 text-left group">
-          <span class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="activeSection === section.id ? (settings.darkMode ? 'bg-stone-600 opacity-45' : 'bg-stone-950 opacity-90') : (settings.darkMode ? 'bg-white opacity-[0.025] group-hover:opacity-[0.06]' : 'bg-stone-950 opacity-[0.035] group-hover:opacity-[0.08]')" style="filter: url(#ink-blot);"></span>
-          <span class="block text-[10px] sm:text-xs uppercase tracking-[0.16em]" :class="activeSection === section.id ? 'text-stone-100' : (settings.darkMode ? 'text-stone-400' : 'text-stone-700')">{{ section.label }}</span>
-          <span class="hidden sm:block text-[9px] mt-1 opacity-50" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">{{ section.note }}</span>
+          <span
+            class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700"
+            :class="activeSection === section.id ? 'opacity-90' : (settings.darkMode ? 'bg-white opacity-[0.025] group-hover:opacity-[0.06]' : 'bg-stone-950 opacity-[0.035] group-hover:opacity-[0.08]')"
+            :style="[selectedSectionBackground(section.id), { filter: 'url(#ink-blot)' }]"
+          ></span>
+          <span
+            class="block text-[10px] sm:text-xs uppercase tracking-[0.16em] transition-colors duration-700"
+            :class="activeSection === section.id ? '' : (settings.darkMode ? 'text-stone-400' : 'text-stone-700')"
+            :style="selectedSectionText(section.id)"
+          >{{ section.label }}</span>
+          <span
+            class="hidden sm:block text-[9px] mt-1 opacity-50 transition-colors duration-700"
+            :class="activeSection === section.id ? '' : (settings.darkMode ? 'text-stone-400' : 'text-stone-600')"
+            :style="selectedSectionText(section.id)"
+          >{{ section.note }}</span>
         </button>
       </nav>
 
