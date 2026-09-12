@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, collection, deleteDoc, doc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import { getDatabase } from "firebase/database"; 
 
 const firebaseConfig = {
@@ -38,21 +38,47 @@ export const logOut = async () => {
   }
 };
 
-// NEW: This function catches the quote and saves it to the user's bookmarks
+const normalizeArchiveValue = value => String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+export const createArchivePassageId = (quoteText, author = 'Unknown') => {
+  const source = `${normalizeArchiveValue(quoteText)}|${normalizeArchiveValue(author)}`;
+  let hash = 2166136261;
+  for (let index = 0; index < source.length; index++) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `passage_${(hash >>> 0).toString(36)}`;
+};
+
 export const saveQuoteToArchive = async (userId, quoteText, author) => {
-  if (!userId) return;
-  
+  if (!userId || !String(quoteText || '').trim()) return null;
+
+  const normalizedAuthor = String(author || 'Unknown').trim() || 'Unknown';
+  const bookmarksRef = collection(db, "users", userId, "bookmarks");
+  const passageId = createArchivePassageId(quoteText, normalizedAuthor);
+
   try {
-    const bookmarksRef = collection(db, "users", userId, "bookmarks");
-    
-    await addDoc(bookmarksRef, {
+    const existingSnapshot = await getDocs(query(bookmarksRef, where("quoteText", "==", quoteText)));
+    const existingDocument = existingSnapshot.docs.find(
+      snapshot => normalizeArchiveValue(snapshot.data().author) === normalizeArchiveValue(normalizedAuthor)
+    );
+    const bookmarkRef = existingDocument?.ref || doc(bookmarksRef, passageId);
+
+    await setDoc(bookmarkRef, {
+      passageId,
       quoteText,
-      author: author || "Unknown",
-      savedAt: serverTimestamp() 
-    });
-    
-    console.log("Passage preserved in archive.");
+      author: normalizedAuthor,
+      savedAt: serverTimestamp()
+    }, { merge: true });
+
+    return { id: bookmarkRef.id, passageId };
   } catch (error) {
     console.error("Failed to preserve passage:", error);
+    throw error;
   }
+};
+
+export const removeQuoteFromArchive = async (userId, bookmarkId) => {
+  if (!userId || !bookmarkId) return;
+  await deleteDoc(doc(db, "users", userId, "bookmarks", bookmarkId));
 };
