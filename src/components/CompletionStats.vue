@@ -1,7 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { settings } from '../store'
-import { useFocusTrap } from '../composables/useFocusTrap'
 
 const props = defineProps({
   mode: { type: String, required: true },
@@ -11,10 +10,6 @@ const props = defineProps({
 
 const emit = defineEmits(['next', 'menu', 'retry'])
 
-const showFlawlessWarning = ref(false)
-const warningDialogRef = ref(null)
-const closeFlawlessWarning = () => { showFlawlessWarning.value = false }
-useFocusTrap(warningDialogRef, { active: showFlawlessWarning, onEscape: closeFlawlessWarning })
 
 const currentAttempt = computed(() => {
   if (!props.attempts || props.attempts.length === 0) return {}
@@ -57,13 +52,7 @@ const annotatedPassage = computed(() => {
   })
 })
 
-const requestRetry = () => {
-  if (currentAttempt.value.accuracy === 100) {
-    showFlawlessWarning.value = true
-  } else {
-    emit('retry')
-  }
-}
+const requestRetry = () => emit('retry')
 </script>
 
 <template>
@@ -91,13 +80,14 @@ const requestRetry = () => {
         <div class="w-px h-12 sm:h-16 opacity-40" :class="settings.darkMode ? 'bg-gradient-to-b from-transparent via-stone-500 to-transparent' : 'bg-gradient-to-b from-transparent via-stone-500 to-transparent'"></div>
         
         <div class="flex flex-col items-center relative">
-          <span class="text-[9px] sm:text-[10px] uppercase tracking-[0.3em] mb-2 sm:mb-3 opacity-60">Clarity</span>
+          <span class="text-[9px] sm:text-[10px] uppercase tracking-[0.3em] mb-2 sm:mb-3 opacity-60">Clarity · Accuracy</span>
           <span class="text-4xl sm:text-5xl font-light font-ui-serif">{{ currentAttempt.accuracy }}<span class="text-sm sm:text-lg opacity-60 font-ui-sans">%</span></span>
           <span v-if="getDelta('accuracy')" class="absolute -bottom-5 text-xs font-semibold tracking-widest" :class="getDelta('accuracy').isImprovement ? 'text-[#DFBE73]' : 'text-red-500/70'">
             {{ getDelta('accuracy').isPositive ? '+' : '-' }}{{ getDelta('accuracy').value }}%
           </span>
         </div>
       </div>
+      <p class="text-[10px] sm:text-xs opacity-60 mb-8 sm:mb-12">WPM counts five typed characters as one word.</p>
 
       <div class="w-24 sm:w-32 h-px opacity-40 mb-8 sm:mb-12 mt-4" :class="settings.darkMode ? 'bg-gradient-to-r from-transparent via-stone-500 to-transparent' : 'bg-gradient-to-r from-transparent via-stone-500 to-transparent'"></div>
 
@@ -127,7 +117,7 @@ const requestRetry = () => {
       </div>
 
       <div v-else class="mb-12 sm:mb-16 flex flex-col items-center text-center px-4">
-        <span class="text-xs sm:text-sm italic opacity-80 font-ui-serif text-[#DFBE73]">A flawless journey. The mind is completely still.</span>
+        <span class="text-xs sm:text-sm italic opacity-80 font-ui-serif text-[#DFBE73]">No typing errors in this attempt.</span>
       </div>
 
       <!-- TANGLED KEYS -->
@@ -153,22 +143,8 @@ const requestRetry = () => {
       </div>
       <div v-else class="mb-8"></div>
 
-      <!-- ACTIONS OR WARNING OVERLAY -->
-      <div v-if="showFlawlessWarning" ref="warningDialogRef" role="alertdialog" aria-modal="true" aria-labelledby="retry-warning-title" tabindex="-1" class="flex flex-col items-center justify-center gap-6 w-full max-w-lg mt-4 animate-fade-in p-6 rounded-lg border border-[#DFBE73]/30 bg-[#DFBE73]/5">
-        <p id="retry-warning-title" class="text-sm font-ui-serif text-[#DFBE73] italic">"The water is perfectly still. A flawless reflection needs no further ripples. Do you truly wish to disturb the surface?"</p>
-        <div class="flex gap-4 w-full">
-          <button @click="closeFlawlessWarning" aria-label="Cancel retry and keep this result" class="relative flex-1 py-3 group transition-transform hover:scale-105">
-            <div class="absolute inset-0 rounded-full transition-opacity bg-[#DFBE73] opacity-10 group-hover:opacity-20" style="filter: url(#ink-blot);"></div>
-            <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] text-[#DFBE73]">Let It Rest</span>
-          </button>
-          <button @click="emit('retry')" aria-label="Retry this passage" class="relative flex-1 py-3 group transition-transform hover:scale-105">
-            <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
-            <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] opacity-70" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-900'">Disturb the Surface</span>
-          </button>
-        </div>
-      </div>
-
-      <div v-else class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 w-full max-w-lg mt-4">
+      <!-- ACTIONS -->
+      <div class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-6 w-full max-w-lg mt-4">
         <button @click="requestRetry" aria-label="Retry this passage" class="relative flex-1 py-3 group transition-transform hover:scale-105">
           <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-10 group-hover:opacity-20' : 'bg-stone-300 opacity-30 group-hover:opacity-50'" style="filter: url(#ink-blot);"></div>
           <span class="relative z-10 tracking-[0.25em] uppercase text-[10px] sm:text-xs font-semibold" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-900'">Retry Passage</span>
