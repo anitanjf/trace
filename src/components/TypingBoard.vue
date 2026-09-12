@@ -12,7 +12,7 @@ const props = defineProps({
   isPaused: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['passage-complete', 'pause', 'resume'])
+const emit = defineEmits(['passage-complete', 'progress', 'pause', 'resume'])
 
 const createSessionId = () =>
   globalThis.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -164,6 +164,14 @@ const processedQuoteText = computed(() => {
   return text
 })
 const poemCharacters = computed(() => processedQuoteText.value.split(''))
+
+watch(typedCount, count => {
+  const total = poemCharacters.value.length || 1
+  emit('progress', {
+    progress: Math.min(100, Math.round((count / total) * 100)),
+    complete: count >= poemCharacters.value.length
+  })
+})
 
 const poemWords = computed(() => {
   const words = []; let currentWord = []
@@ -553,6 +561,7 @@ onBeforeUnmount(() => {
       <span class="text-[10px] sm:text-xs tracking-[0.3em] uppercase transition-colors duration-1000 text-center" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-600'">
         <template v-if="props.gameMode === 'daily'">Daily Focus &middot; Reflection {{ props.passageNumber }}</template>
         <template v-else-if="props.gameMode === 'flow'">Flow State &middot; {{ props.passageNumber }} Words</template>
+        <template v-else-if="props.gameMode === 'multiplayer'">Shared Passage &middot; {{ props.passageNumber }}</template>
         <template v-else>{{ props.seasonName }} &middot; Passage {{ props.passageNumber }}</template>
       </span>
     </div>

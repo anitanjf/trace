@@ -1,60 +1,68 @@
-const ROOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
-export const ROOM_CODE_LENGTH = 8
-export const ROOM_LIFETIME_MS = 4 * 60 * 60 * 1000
-const secureRandom = () => {
-  if (!globalThis.crypto?.getRandomValues) return Math.random()
-  const value = new Uint32Array(1)
-  globalThis.crypto.getRandomValues(value)
-  return value[0] / 2 ** 32
-}
+export const ROOM_CODE_LENGTH = 7
+export const ROOM_GRACE_MS = 30_000
+export const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
+export const PUBLIC_START_DELAY_MS = 12_000
+export const MIN_PLAYERS = 2
+export const MAX_PLAYERS = 5
+export const ROOM_SLOTS = ['one', 'two', 'three', 'four', 'five']
+
+const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
 export const normalizeRoomCode = value =>
-  String(value || '')
-    .toUpperCase()
-    .replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '')
-    .slice(0, ROOM_CODE_LENGTH)
+  String(value || '').toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, ROOM_CODE_LENGTH)
 
-export const createRoomCode = (random = secureRandom) =>
-  Array.from({ length: ROOM_CODE_LENGTH }, () =>
-    ROOM_ALPHABET[Math.floor(random() * ROOM_ALPHABET.length)]
+export const createRoomCode = () => {
+  const values = new Uint32Array(ROOM_CODE_LENGTH)
+  globalThis.crypto?.getRandomValues?.(values)
+  return Array.from(values, (value, index) =>
+    ROOM_ALPHABET[(value || Date.now() + index * 17) % ROOM_ALPHABET.length]
   ).join('')
+}
+
+export const isReservedPlayer = (player, now = Date.now()) => Boolean(
+  player?.uid &&
+  (player.connected !== false || now - Number(player.disconnectedAt || player.lastSeen || 0) <= ROOM_GRACE_MS)
+)
+
+export const getRoomPlayers = (players = {}, now = Date.now()) =>
+  ROOM_SLOTS
+    .map(seat => ({ seat, ...(players?.[seat] || {}) }))
+    .filter(player => isReservedPlayer(player, now))
+
+export const getConnectedPlayers = (players = {}) =>
+  ROOM_SLOTS
+    .map(seat => ({ seat, ...(players?.[seat] || {}) }))
+    .filter(player => player.uid && player.connected !== false)
+
+export const findPlayerSeat = (players = {}, uid) =>
+  ROOM_SLOTS.find(seat => players?.[seat]?.uid === uid) || null
+
+export const findOpenSeat = (players = {}, now = Date.now()) =>
+  ROOM_SLOTS.find(seat => !isReservedPlayer(players?.[seat], now)) || null
+
+export const isRoomExpired = (meta, now = Date.now()) => {
+  if (!meta) return true
+  if (Number(meta.expiresAt || 0) <= now) return true
+  return Boolean(meta.hostDisconnectedAt) &&
+    now > Number(meta.hostDisconnectedAt) + ROOM_GRACE_MS
+}
+
+export const canJoinRoom = (room, uid, now = Date.now()) => {
+  if (!room?.meta || isRoomExpired(room.meta, now)) return false
+  if (findPlayerSeat(room.players, uid)) return true
+  return room.meta.status === 'lobby' && Boolean(findOpenSeat(room.players, now))
+}
 
 export const calculatePassageProgress = (typedText, passageText) => {
-  const passage = String(passageText || '')
-  if (!passage.length) return 0
-
-  const typed = String(typedText || '').slice(0, passage.length)
-  let matched = 0
-  for (let index = 0; index < typed.length; index += 1) {
-    if (typed[index] === passage[index]) matched += 1
-  }
-  return Math.round((matched / passage.length) * 100)
+  const total = String(passageText || '').length || 1
+  return Math.min(100, Math.round((String(typedText || '').length / total) * 100))
 }
 
 export const isPassageComplete = (typedText, passageText) =>
-  String(typedText || '') === String(passageText || '')
+  String(typedText || '').length >= String(passageText || '').length
 
-export const getLatencyTone = latencyMs => {
-  if (!Number.isFinite(latencyMs)) return 'Listening'
-  if (latencyMs < 120) return 'Near'
-  if (latencyMs < 300) return 'Gentle delay'
-  return 'Distant'
-}
-
-export const createProgressMessage = ({ clientId, roomCode, progress, complete }) => ({
-  clientId,
-  roomCode: normalizeRoomCode(roomCode),
-  progress: Math.max(0, Math.min(100, Number(progress) || 0)),
-  complete: Boolean(complete),
-  sentAt: Date.now()
-})
-
-export const getActiveMembers = (members, now = Date.now(), timeoutMs = 20_000) =>
+// Compatibility for the first quiet-room prototype.
+export const getActiveMembers = (members = {}, now = Date.now(), timeout = ROOM_GRACE_MS) =>
   Object.entries(members || {})
-    .filter(([, member]) => member && now - Number(member.lastSeen || 0) < timeoutMs)
-    .map(([id, member]) => ({
-      id,
-      progress: Math.max(0, Math.min(100, Number(member.progress) || 0)),
-      complete: Boolean(member.complete),
-      lastSeen: Number(member.lastSeen) || 0
-    }))
+    .filter(([, member]) => member?.uid || now - Number(member?.lastSeen || 0) <= timeout)
+    .map(([id, member]) => ({ id, ...member }))
