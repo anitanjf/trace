@@ -8,7 +8,7 @@ const router = useRouter()
 const showMultiplayerModal = ref(false)
 
 const lifetimeAccuracy = computed(() => {
-  if (stats.value.lifetimeKeystrokes === 0) return 100
+  if (stats.value.lifetimeKeystrokes === 0) return null
   const correct = stats.value.lifetimeKeystrokes - stats.value.lifetimeMistakes
   return Math.max(0, Math.round((correct / stats.value.lifetimeKeystrokes) * 100))
 })
@@ -58,8 +58,14 @@ const lifetimeAccuracy = computed(() => {
 
     <div class="flex justify-center gap-12 sm:gap-16 text-xs sm:text-[11px] uppercase tracking-[0.3em] opacity-80 pt-2 font-ui-sans" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-600'">
       <div class="flex flex-col items-center gap-1"><span class="opacity-40">Passages</span><span class="text-xs font-light">{{ stats.lifetimePassages }}</span></div>
-      <div class="flex flex-col items-center gap-1"><span class="opacity-40">Clarity</span><span class="text-xs font-light">{{ lifetimeAccuracy }}%</span></div>
+      <div class="flex flex-col items-center gap-1">
+        <span class="opacity-40">Clarity · Accuracy</span>
+        <span class="text-xs font-light">{{ lifetimeAccuracy === null ? 'No data' : `${lifetimeAccuracy}%` }}</span>
+      </div>
     </div>
+    <p v-if="lifetimeAccuracy === null" class="text-[10px] normal-case tracking-normal opacity-60 -mt-5">
+      Complete a passage to see your accuracy.
+    </p>
 
     <!-- POETIC MOBILE INDICATOR -->
     <div class="block sm:hidden text-center mt-12 px-6">
