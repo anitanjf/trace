@@ -6,12 +6,31 @@ import { logOut, db } from '../services/firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AuthModal from '../components/AuthModal.vue'
 import Heatmap from '../components/Heatmap.vue'
-import { seasons } from '../utils/constants'
+import { seasons, seasonInkPalette } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
 const router = useRouter()
 const showAuthModal = ref(false)
 const activeTab = ref(getRealWorldSeason())
+const themeSeasonIndex = computed(() =>
+  settings.value.themeMode === 'locked'
+    ? Number(settings.value.lockedSeason || 0)
+    : getRealWorldSeason()
+)
+const activeSeasonInk = computed(() => {
+  const palette = seasonInkPalette[themeSeasonIndex.value] || seasonInkPalette[0]
+  return {
+    backgroundColor: settings.value.darkMode ? palette.dark : palette.light,
+    color: settings.value.darkMode ? palette.darkText : palette.lightText
+  }
+})
+const achievementInk = unlocked => unlocked
+  ? {
+      borderColor: activeSeasonInk.value.backgroundColor,
+      color: activeSeasonInk.value.backgroundColor,
+      boxShadow: `0 0 15px ${activeSeasonInk.value.backgroundColor}33`
+    }
+  : undefined
 const expandedPassageId = ref(null)
 const searchQuery = ref('')
 const profileMessage = ref('')
@@ -229,7 +248,7 @@ const radarData = computed(() => {
         <div class="order-1 flex flex-col items-center flex-shrink-0 animate-fade-in text-center w-full md:col-start-1 md:row-start-1">
           <div class="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden mb-6 shadow-sm p-1" :class="settings.darkMode ? 'bg-stone-800/50' : 'bg-stone-300/30'">
              <img :src="customProfile.isAnonymous ? 'https://api.dicebear.com/7.x/shapes/svg?seed=zen' : (currentUser.photoURL || '/default-avatar.png')" alt="Profile" class="w-full h-full object-cover grayscale rounded-full hover:grayscale-0 transition-all duration-700" />
-             <div class="absolute inset-0 rounded-full opacity-30 pointer-events-none" style="filter: url(#ink-blot);" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-400'"></div>
+             <div class="absolute inset-0 rounded-full opacity-30 pointer-events-none transition-colors duration-700" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
           </div>
           
           <div class="flex flex-col gap-1 w-full items-center px-2 md:px-0">
@@ -249,9 +268,9 @@ const radarData = computed(() => {
                 {{ customProfile.bio || 'Silence is the root of all sound.' }}
               </p>
               
-              <button @click="isEditing = true" class="relative px-6 py-2.5 w-full max-w-[260px] md:max-w-[200px] group transition-transform hover:scale-105 mb-10">
-                <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-10 group-hover:opacity-20' : 'bg-stone-800 opacity-15 group-hover:opacity-25'" style="filter: url(#ink-blot);"></div>
-                <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] font-semibold" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-900'">Edit profile</span>
+              <button @click="isEditing = true" class="relative isolate px-6 py-2.5 w-full max-w-[260px] md:max-w-[200px] group transition-transform hover:scale-105 mb-10">
+                <div class="absolute inset-0 -z-10 rounded-full transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72] group-hover:opacity-[0.82]' : 'opacity-[0.62] group-hover:opacity-[0.72]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
+                <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] font-semibold transition-colors duration-700" :style="{ color: activeSeasonInk.color }">Edit profile</span>
               </button>
             </template>
             <template v-else>
@@ -277,9 +296,9 @@ const radarData = computed(() => {
                   </div>
                </div>
                <div class="flex gap-4 w-full max-w-[260px] md:max-w-[200px] mb-8 mt-2 px-4 md:px-0">
-                  <button @click="saveProfile" class="relative flex-1 py-3 md:py-2 group transition-transform hover:scale-105">
-                    <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-10 group-hover:opacity-20' : 'bg-stone-800 opacity-15 group-hover:opacity-25'" style="filter: url(#ink-blot);"></div>
-                    <span class="relative z-10 tracking-widest uppercase text-[9px] font-semibold" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-900'">Save</span>
+                  <button @click="saveProfile" class="relative isolate flex-1 py-3 md:py-2 group transition-transform hover:scale-105">
+                    <div class="absolute inset-0 -z-10 rounded-full transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72] group-hover:opacity-[0.82]' : 'opacity-[0.62] group-hover:opacity-[0.72]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
+                    <span class="relative z-10 tracking-widest uppercase text-[9px] font-semibold transition-colors duration-700" :style="{ color: activeSeasonInk.color }">Save</span>
                   </button>
                   <button @click="isEditing = false; fetchProfile()" class="relative flex-1 py-3 md:py-2 group transition-transform hover:scale-105">
                     <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-stone-700 opacity-20 group-hover:opacity-30' : 'bg-stone-400 opacity-20 group-hover:opacity-30'" style="filter: url(#ink-blot);"></div>
@@ -301,7 +320,7 @@ const radarData = computed(() => {
             
             <div class="w-full flex flex-wrap justify-center md:justify-start gap-2 sm:gap-4 mb-6 md:mb-12 border-b pb-4" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'">
               <button v-for="(season, index) in seasons" :key="index" @click="activeTab = index; searchQuery = ''" class="relative px-4 sm:px-5 py-2.5 text-[8px] sm:text-[9px] tracking-[0.25em] uppercase transition-all duration-300 group" :class="activeTab === index ? (settings.darkMode ? 'text-stone-100 font-semibold' : 'text-stone-900 font-semibold') : (settings.darkMode ? 'text-stone-400 hover:text-stone-200' : 'text-stone-700 hover:text-stone-900')">
-                <div v-if="activeTab === index" class="absolute inset-0 rounded-sm pointer-events-none z-[-1] transition-opacity duration-300" :class="settings.darkMode ? 'bg-white opacity-[0.15]' : 'bg-stone-800 opacity-[0.12]'" style="filter: url(#ink-blot);"></div>
+                <div v-if="activeTab === index" class="absolute inset-0 rounded-sm pointer-events-none z-[-1] transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72]' : 'opacity-[0.62]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
                 <div v-if="activeTab !== index" class="absolute inset-0 rounded-sm pointer-events-none z-[-1] opacity-0 group-hover:opacity-[0.05] transition-opacity duration-300" :class="settings.darkMode ? 'bg-white' : 'bg-stone-800'" style="filter: url(#ink-blot);"></div>
                 {{ season.name }}
               </button>
@@ -327,25 +346,25 @@ const radarData = computed(() => {
                        <line x1="100" y1="100" x2="20" y2="150" stroke="currentColor" class="opacity-10" stroke-width="1"/>
                        <line x1="100" y1="100" x2="20" y2="50" stroke="currentColor" class="opacity-10" stroke-width="1"/>
                        
-                       <polygon :points="radarData.polygon" :fill="settings.darkMode ? 'rgba(223, 190, 115, 0.2)' : 'rgba(150, 150, 150, 0.2)'" :stroke="settings.darkMode ? '#DFBE73' : 'currentColor'" stroke-width="1.5" class="opacity-70 transition-all duration-1000 ease-out"/>
+                       <polygon :points="radarData.polygon" :fill="activeSeasonInk.backgroundColor" :stroke="activeSeasonInk.backgroundColor" stroke-width="1.5" class="opacity-45 transition-all duration-1000 ease-out"/>
                        
-                       <circle v-for="(p, i) in radarData.points" :key="i" :cx="p.x" :cy="p.y" r="2.5" :fill="settings.darkMode ? '#DFBE73' : 'currentColor'" class="transition-all duration-1000 ease-out"/>
+                       <circle v-for="(p, i) in radarData.points" :key="i" :cx="p.x" :cy="p.y" r="2.5" :fill="activeSeasonInk.backgroundColor" class="transition-all duration-1000 ease-out"/>
                     </svg>
 
                     <!-- Interactive Labels -->
-                    <span @mouseenter="hoveredMetric = 'Speed'" @mouseleave="hoveredMetric = null" class="absolute -top-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Speed' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Speed</span>
-                    <span @mouseenter="hoveredMetric = 'Clarity'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -right-8 sm:-right-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Clarity' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Clarity</span>
-                    <span @mouseenter="hoveredMetric = 'Consistency'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -right-10 sm:-right-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Consistency' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Consistency</span>
-                    <span @mouseenter="hoveredMetric = 'Focus'" @mouseleave="hoveredMetric = null" class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Focus' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Focus</span>
-                    <span @mouseenter="hoveredMetric = 'Resilience'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -left-10 sm:-left-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Resilience' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Resilience</span>
-                    <span @mouseenter="hoveredMetric = 'Stamina'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -left-8 sm:-left-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Stamina' ? 'opacity-100 text-[#DFBE73]' : 'opacity-60'">Stamina</span>
+                    <span @mouseenter="hoveredMetric = 'Speed'" @mouseleave="hoveredMetric = null" class="absolute -top-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Speed' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Speed' ? { color: activeSeasonInk.backgroundColor } : undefined">Speed</span>
+                    <span @mouseenter="hoveredMetric = 'Clarity'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -right-8 sm:-right-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Clarity' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Clarity' ? { color: activeSeasonInk.backgroundColor } : undefined">Clarity</span>
+                    <span @mouseenter="hoveredMetric = 'Consistency'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -right-10 sm:-right-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Consistency' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Consistency' ? { color: activeSeasonInk.backgroundColor } : undefined">Consistency</span>
+                    <span @mouseenter="hoveredMetric = 'Focus'" @mouseleave="hoveredMetric = null" class="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Focus' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Focus' ? { color: activeSeasonInk.backgroundColor } : undefined">Focus</span>
+                    <span @mouseenter="hoveredMetric = 'Resilience'" @mouseleave="hoveredMetric = null" class="absolute bottom-[18%] -left-10 sm:-left-12 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Resilience' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Resilience' ? { color: activeSeasonInk.backgroundColor } : undefined">Resilience</span>
+                    <span @mouseenter="hoveredMetric = 'Stamina'" @mouseleave="hoveredMetric = null" class="absolute top-[18%] -left-8 sm:-left-10 text-[5px] sm:text-[6px] uppercase tracking-widest transition-opacity cursor-help p-1" :class="hoveredMetric === 'Stamina' ? 'opacity-100' : 'opacity-60'" :style="hoveredMetric === 'Stamina' ? { color: activeSeasonInk.backgroundColor } : undefined">Stamina</span>
                  </div>
 
                  <!-- Dynamic Tooltip Display -->
                  <div class="h-10 mt-6 flex items-start justify-center text-center px-4 w-full max-w-[200px] transition-all duration-500" 
                       :class="hoveredMetric ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'">
                    <p class="text-[7px] sm:text-[8px] leading-relaxed tracking-widest font-ui-sans" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-600'">
-                     <span class="text-[#DFBE73] font-semibold mr-1">{{ hoveredMetric }}:</span> 
+                     <span class="font-semibold mr-1 transition-colors duration-700" :style="{ color: activeSeasonInk.backgroundColor }">{{ hoveredMetric }}:</span> 
                      {{ hoveredMetric ? metricDefinitions[hoveredMetric] : '' }}
                    </p>
                  </div>
@@ -363,7 +382,7 @@ const radarData = computed(() => {
 
                  <!-- OVERALL STATS CONTAINER -->
                  <div class="w-full relative py-6 px-4 transition-all duration-700 ease-in-out min-h-[120px]">
-                   <div class="absolute inset-0 pointer-events-none opacity-[0.04] rounded-sm transition-all duration-700" :class="settings.darkMode ? 'bg-white' : 'bg-black'" style="filter: url(#ink-blot);"></div>
+                   <div class="absolute inset-0 pointer-events-none rounded-sm opacity-[0.12] transition-[background-color,opacity] duration-700" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
                    
                    <div class="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4 relative z-10 text-center">
                      <div class="flex flex-col gap-1.5">
@@ -407,7 +426,7 @@ const radarData = computed(() => {
                            <div class="flex items-center gap-6 text-[8px] sm:text-[9px] uppercase tracking-widest font-ui-sans">
                              <div class="flex items-center gap-4 transition-opacity duration-500"
                                   :class="settings.darkMode ? 'opacity-50 group-hover:opacity-90' : 'opacity-60 group-hover:opacity-100'">
-                               <span :class="passage.attempts[passage.attempts.length-1].accuracy === 100 ? 'text-[#DFBE73]' : ''">
+                               <span :style="passage.attempts[passage.attempts.length-1].accuracy === 100 ? { color: activeSeasonInk.backgroundColor } : undefined">
                                  {{ passage.attempts[passage.attempts.length-1].accuracy }}%
                                </span>
                                <span class="w-10 text-right">{{ passage.attempts[passage.attempts.length-1].wpm }} <span class="text-[6px] opacity-60">WPM</span></span>
@@ -427,7 +446,7 @@ const radarData = computed(() => {
                                </span>
                                
                                <div class="flex gap-4 sm:gap-6 justify-end" :class="index === passage.attempts.length - 1 ? (settings.darkMode ? 'text-stone-300 font-semibold' : 'text-stone-800 font-semibold') : 'opacity-40'">
-                                 <span :class="attempt.accuracy === 100 ? 'text-[#DFBE73]' : ''">{{ attempt.accuracy }}%</span>
+                                 <span :style="attempt.accuracy === 100 ? { color: activeSeasonInk.backgroundColor } : undefined">{{ attempt.accuracy }}%</span>
                                  <span class="w-10 text-right">{{ attempt.wpm }} <span class="text-[6px] opacity-50">WPM</span></span>
                                </div>
                              </div>
@@ -464,28 +483,28 @@ const radarData = computed(() => {
                  <!-- 1. The First Step (Enso Circle) -->
                  <div @mouseenter="hoveredAchievement = 'firstStep'" @mouseleave="hoveredAchievement = null" 
                       class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
-                      :class="stats.achievements?.firstStep?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                      :class="stats.achievements?.firstStep?.unlocked ? '' : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')" :style="achievementInk(stats.achievements?.firstStep?.unlocked)">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10" stroke-linecap="round"/></svg>
                  </div>
 
                  <!-- 2. Still Water (Ripples) -->
                  <div @mouseenter="hoveredAchievement = 'stillWater'" @mouseleave="hoveredAchievement = null" 
                       class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
-                      :class="stats.achievements?.stillWater?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                      :class="stats.achievements?.stillWater?.unlocked ? '' : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')" :style="achievementInk(stats.achievements?.stillWater?.unlocked)">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="11"/></svg>
                  </div>
 
                  <!-- 3. Endless Journey (Infinity Path) -->
                  <div @mouseenter="hoveredAchievement = 'endlessJourney'" @mouseleave="hoveredAchievement = null" 
                       class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
-                      :class="stats.achievements?.endlessJourney?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                      :class="stats.achievements?.endlessJourney?.unlocked ? '' : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')" :style="achievementInk(stats.achievements?.endlessJourney?.unlocked)">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M8 8C4.686 8 2 10.686 2 14s2.686 6 6 6c2.5 0 4.5-1.5 5.5-3.5L16 10c1-2 3-3.5 5.5-3.5 3.314 0 6 2.686 6 6s-2.686 6-6 6" /></svg>
                  </div>
 
                  <!-- 4. Midnight Lotus (Moon) -->
                  <div @mouseenter="hoveredAchievement = 'midnightLotus'" @mouseleave="hoveredAchievement = null" 
                       class="w-12 h-12 rounded-full border flex items-center justify-center transition-all duration-500 cursor-help"
-                      :class="stats.achievements?.midnightLotus?.unlocked ? (settings.darkMode ? 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.15)]' : 'border-[#DFBE73] text-[#DFBE73] shadow-[0_0_15px_rgba(223,190,115,0.3)]') : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')">
+                      :class="stats.achievements?.midnightLotus?.unlocked ? '' : (settings.darkMode ? 'border-stone-800 text-stone-700 border-dashed' : 'border-stone-300 text-stone-300 border-dashed')" :style="achievementInk(stats.achievements?.midnightLotus?.unlocked)">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/><path d="M12 18v4"/><path d="M8 20l4-2 4 2"/></svg>
                  </div>
               </div>
@@ -493,7 +512,7 @@ const radarData = computed(() => {
               <!-- Dynamic Achievement Tooltip -->
               <div class="h-12 mt-6 flex flex-col items-center justify-center text-center w-full transition-all duration-500" 
                    :class="hoveredAchievement ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'">
-                <p class="text-[9px] uppercase tracking-widest font-semibold mb-1" :class="settings.darkMode ? 'text-[#DFBE73]' : 'text-[#cfa444]'">
+                <p class="text-[9px] uppercase tracking-widest font-semibold mb-1 transition-colors duration-700" :style="{ color: activeSeasonInk.backgroundColor }">
                   {{ hoveredAchievement ? achievementDefs[hoveredAchievement].name : '' }}
                 </p>
                 <p class="text-[7px] tracking-widest opacity-60 font-ui-sans" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-600'">
@@ -509,9 +528,9 @@ const radarData = computed(() => {
                 <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] font-semibold transition-colors" :class="settings.darkMode ? 'text-red-400 group-hover:text-red-300' : 'text-red-700 group-hover:text-red-600'">Sign out</span>
               </button>
               
-              <button v-if="!showAuthModal" @click="router.push('/')" class="relative px-6 py-3 md:py-2.5 w-full group transition-transform hover:scale-105">
-                <div class="absolute inset-0 rounded-full transition-opacity" :class="settings.darkMode ? 'bg-white opacity-5 group-hover:opacity-15' : 'bg-stone-800 opacity-5 group-hover:opacity-10'" style="filter: url(#ink-blot);"></div>
-                <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] font-semibold transition-colors" :class="settings.darkMode ? 'text-stone-400 group-hover:text-stone-200' : 'text-stone-600 group-hover:text-stone-900'">Return to Menu</span>
+              <button v-if="!showAuthModal" @click="router.push('/')" class="relative isolate px-6 py-3 md:py-2.5 w-full group transition-transform hover:scale-105">
+                <div class="absolute inset-0 -z-10 rounded-full transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72] group-hover:opacity-[0.82]' : 'opacity-[0.62] group-hover:opacity-[0.72]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
+                <span class="relative z-10 tracking-[0.2em] uppercase text-[9px] font-semibold transition-colors duration-700" :style="{ color: activeSeasonInk.color }">Return to Menu</span>
               </button>
             </div>
           </div>
