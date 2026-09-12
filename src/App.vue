@@ -16,7 +16,7 @@ useAppAudio()
 
     <transition name="splash-fade">
       <!-- 2. The Main App (Revealed when Firebase finishes loading) -->
-      <div v-if="isAppReady" class="w-full min-h-[100dvh] flex flex-col items-center justify-center absolute inset-0 z-10 overflow-x-hidden overflow-y-auto">
+      <div v-if="isAppReady" class="w-full min-h-[100dvh] flex flex-col items-center justify-start sm:justify-center absolute inset-0 z-10 overflow-x-hidden overflow-y-auto overscroll-y-contain">
         <router-view :key="$route.fullPath"></router-view>
       </div>
 
