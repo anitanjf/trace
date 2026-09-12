@@ -190,7 +190,21 @@ const mergeProgress = (remoteStats = {}, localStats = {}) => {
   const merged = { ...getDefaultStats(), ...remoteStats }
   merged.activityGrid = { ...(remoteStats.activityGrid || {}) }
   merged.dailyCompletions = { ...(remoteStats.dailyCompletions || {}) }
-  merged.lastDailyDateKey = [remoteStats.lastDailyDateKey, localStats.lastDailyDateKey]
+  const migratedRemoteDailyDate = migrateLegacyDailyDate(remoteStats.lastDailyDate)
+  if (migratedRemoteDailyDate && !merged.dailyCompletions[migratedRemoteDailyDate]) {
+    merged.dailyCompletions[migratedRemoteDailyDate] = {
+      sessionId: null,
+      completedAt: Date.now(),
+      passageId: null,
+      timeZone: null,
+      legacy: true
+    }
+  }
+  merged.lastDailyDateKey = [
+    remoteStats.lastDailyDateKey,
+    migratedRemoteDailyDate,
+    localStats.lastDailyDateKey
+  ]
     .filter(Boolean)
     .sort()
     .at(-1) || null
@@ -206,6 +220,9 @@ const mergeProgress = (remoteStats = {}, localStats = {}) => {
     if (merged.sessionLedger[sessionId]) continue
     merged.sessionLedger[sessionId] = session
     applySessionDelta(merged, session)
+  }
+  for (const [dateKey, completion] of Object.entries(localStats.dailyCompletions || {})) {
+    if (!merged.dailyCompletions[dateKey]) merged.dailyCompletions[dateKey] = completion
   }
   return merged
 }
