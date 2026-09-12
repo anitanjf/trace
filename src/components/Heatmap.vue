@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue';
 import { settings } from '../store';
+import { parseLocalDateKey } from '../utils/datePolicy';
 
 const props = defineProps({
   activityGrid: {
@@ -9,12 +10,13 @@ const props = defineProps({
   }
 });
 
-const selectedYear = ref(2026);
-const years = [2026, 2025, 2024, 2023];
+const currentYear = new Date().getFullYear();
+const selectedYear = ref(currentYear);
+const years = Array.from({ length: 4 }, (_, index) => currentYear - index);
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 const formatDate = (dateStr) => {
-  const date = new Date(dateStr);
+  const date = parseLocalDateKey(dateStr);
   const month = date.toLocaleString('default', { month: 'long' });
   const day = date.getDate();
   const nth = (d) => {

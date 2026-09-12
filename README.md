@@ -16,6 +16,10 @@ Trace is a mindful typing space for seasonal reflection, quiet focus, and progre
 - **Reading comfort:** Adjust typography, text size, spacing, alignment, motion, and appearance.
 - **Cloud sync:** Keep signed-in progress and preferences with Firebase.
 
+## Daily Reflection policy
+
+Daily Reflection follows the device's local calendar date. It becomes available again at the next local midnight, uses the same local `YYYY-MM-DD` key as Archive activity, and awards daily credit only once for that date—even after reload, retry, sync, or a timezone change. Passage selection is stable for each date and cached for reloads; bundled passages provide a defined fallback when the remote collection is unavailable.
+
 ## Product identity
 
 Trace uses a custom ink-mark favicon, route-aware browser metadata, install metadata, and social-sharing artwork. The interface shares one six-season palette across Home, Preferences, Profile, About, and Archive.

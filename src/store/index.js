@@ -1,5 +1,6 @@
 import { ref, watch } from 'vue'
 import { getRealWorldSeason, calculateTimeOfDay } from '../utils/helpers'
+import { getLocalDateKey, migrateLegacyDailyDate } from '../utils/datePolicy'
 import { auth, db } from '../services/firebase'
 import { onAuthStateChanged } from 'firebase/auth'
 import { doc, getDoc, setDoc, runTransaction } from 'firebase/firestore'
@@ -11,6 +12,8 @@ const getDefaultStats = () => ({
   lifetimeDaily: 0,
   lifetimeKeystrokes: 0,
   lifetimeMistakes: 0,
+  lastDailyDateKey: null,
+  dailyCompletions: {},
   activityGrid: {}, 
   passageHistory: {},
   sessionLedger: {}, 
@@ -132,6 +135,25 @@ const getInstallationId = () => {
   return created
 }
 
+const claimDailyDelta = (target, session) => {
+  const requestedDelta = session.dailyDelta || 0
+  if (!requestedDelta || !session.dailyDateKey) return requestedDelta
+
+  if (!target.dailyCompletions) target.dailyCompletions = {}
+  if (target.dailyCompletions[session.dailyDateKey]) return 0
+
+  target.dailyCompletions[session.dailyDateKey] = {
+    sessionId: session.id,
+    completedAt: session.completedAt || Date.now(),
+    passageId: session.passageId || null,
+    timeZone: session.timeZone || null
+  }
+  if (!target.lastDailyDateKey || session.dailyDateKey > target.lastDailyDateKey) {
+    target.lastDailyDateKey = session.dailyDateKey
+  }
+  return requestedDelta
+}
+
 const applySessionDelta = (target, session) => {
   if (session.legacySeasonal) {
     for (const [season, values] of Object.entries(session.legacySeasonal)) {
@@ -152,12 +174,13 @@ const applySessionDelta = (target, session) => {
   }
 
   const season = session.season ?? getRealWorldSeason()
+  const dailyDelta = claimDailyDelta(target, session)
   if (!target.seasonal[season]) target.seasonal[season] = { passages: 0, keystrokes: 0, mistakes: 0, quotes: [] }
   target.lifetimePassages += session.passageDelta || 0
-  target.lifetimeDaily += session.dailyDelta || 0
+  target.lifetimeDaily += dailyDelta
   target.lifetimeKeystrokes += session.keystrokes || 0
   target.lifetimeMistakes += session.mistakes || 0
-  target.seasonal[season].passages += session.passageDelta || session.dailyDelta || 0
+  target.seasonal[season].passages += session.passageDelta || dailyDelta || 0
   target.seasonal[season].keystrokes += session.keystrokes || 0
   target.seasonal[season].mistakes += session.mistakes || 0
   if (session.date) target.activityGrid[session.date] = (target.activityGrid[session.date] || 0) + 1
@@ -166,6 +189,25 @@ const applySessionDelta = (target, session) => {
 const mergeProgress = (remoteStats = {}, localStats = {}) => {
   const merged = { ...getDefaultStats(), ...remoteStats }
   merged.activityGrid = { ...(remoteStats.activityGrid || {}) }
+  merged.dailyCompletions = { ...(remoteStats.dailyCompletions || {}) }
+  const migratedRemoteDailyDate = migrateLegacyDailyDate(remoteStats.lastDailyDate)
+  if (migratedRemoteDailyDate && !merged.dailyCompletions[migratedRemoteDailyDate]) {
+    merged.dailyCompletions[migratedRemoteDailyDate] = {
+      sessionId: null,
+      completedAt: Date.now(),
+      passageId: null,
+      timeZone: null,
+      legacy: true
+    }
+  }
+  merged.lastDailyDateKey = [
+    remoteStats.lastDailyDateKey,
+    migratedRemoteDailyDate,
+    localStats.lastDailyDateKey
+  ]
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null
   merged.passageHistory = { ...(remoteStats.passageHistory || {}), ...(localStats.passageHistory || {}) }
   merged.achievements = { ...getDefaultStats().achievements, ...(remoteStats.achievements || {}) }
   for (const [key, value] of Object.entries(localStats.achievements || {})) {
@@ -178,6 +220,9 @@ const mergeProgress = (remoteStats = {}, localStats = {}) => {
     if (merged.sessionLedger[sessionId]) continue
     merged.sessionLedger[sessionId] = session
     applySessionDelta(merged, session)
+  }
+  for (const [dateKey, completion] of Object.entries(localStats.dailyCompletions || {})) {
+    if (!merged.dailyCompletions[dateKey]) merged.dailyCompletions[dateKey] = completion
   }
   return merged
 }
@@ -241,15 +286,13 @@ export const recordSession = (session = {}) => {
   if (!stats.value.sessionLedger) stats.value.sessionLedger = {}
   if (stats.value.sessionLedger[session.id]) return false
 
-  const today = new Date()
-  const date = today.getFullYear() + '-' +
-    String(today.getMonth() + 1).padStart(2, '0') + '-' +
-    String(today.getDate()).padStart(2, '0')
+  const completedAt = session.completedAt || Date.now()
+  const date = getLocalDateKey(completedAt)
 
   stats.value.sessionLedger[session.id] = {
     id: session.id,
     mode: session.mode || 'meditation',
-    completedAt: session.completedAt || Date.now(),
+    completedAt,
     elapsedMs: Math.max(0, Number(session.elapsedMs) || 0),
     date,
     season: session.season ?? getRealWorldSeason(),
@@ -257,6 +300,8 @@ export const recordSession = (session = {}) => {
     wordCount: Math.max(0, Number(session.wordCount) || 0),
     passageDelta: session.passageDelta || 0,
     dailyDelta: session.dailyDelta || 0,
+    dailyDateKey: session.dailyDateKey || null,
+    timeZone: session.timeZone || null,
     keystrokes: session.keystrokes || 0,
     mistakes: session.mistakes || 0,
     accuracy: Math.max(0, Math.min(100, Number(session.accuracy) || 0)),
@@ -332,6 +377,20 @@ export const initStore = () => {
   if (savedStats) {
     const parsed = savedStats
     if (parsed.lifetimeDaily === undefined) parsed.lifetimeDaily = 0
+    if (parsed.dailyCompletions === undefined) parsed.dailyCompletions = {}
+    if (!parsed.lastDailyDateKey && parsed.lastDailyDate !== undefined) {
+      const migratedDailyDate = migrateLegacyDailyDate(parsed.lastDailyDate)
+      if (migratedDailyDate) {
+        parsed.lastDailyDateKey = migratedDailyDate
+        parsed.dailyCompletions[migratedDailyDate] ||= {
+          sessionId: null,
+          completedAt: Date.now(),
+          passageId: null,
+          timeZone: null,
+          legacy: true
+        }
+      }
+    }
     if (parsed.activityGrid === undefined) parsed.activityGrid = {}
     if (!parsed.seasonal || typeof parsed.seasonal !== 'object') parsed.seasonal = getDefaultStats().seasonal 
     if (parsed.passageHistory === undefined) parsed.passageHistory = {}
