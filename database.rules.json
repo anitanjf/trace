@@ -1,0 +1,29 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "quietRooms": {
+      "$roomId": {
+        "meta": {
+          ".read": "auth != null && (!data.exists() || (data.child('expiresAt').isNumber() && data.child('expiresAt').val() > now))",
+          ".write": "auth != null && !data.exists() && newData.exists()",
+          ".validate": "$roomId.matches(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/) && newData.hasChildren(['createdAt', 'expiresAt', 'passageIndex', 'schemaVersion']) && newData.numChildren() === 4 && newData.child('createdAt').isNumber() && newData.child('createdAt').val() >= now - 300000 && newData.child('createdAt').val() <= now + 300000 && newData.child('expiresAt').isNumber() && newData.child('expiresAt').val() > now && newData.child('expiresAt').val() <= now + 14400000 && newData.child('passageIndex').isNumber() && newData.child('passageIndex').val() >= 0 && newData.child('passageIndex').val() <= 4 && newData.child('schemaVersion').val() === 1"
+        },
+        "members": {
+          ".read": "auth != null && root.child('quietRooms').child($roomId).child('meta').child('expiresAt').val() > now",
+          "$clientId": {
+            ".write": "auth != null && root.child('quietRooms').child($roomId).child('meta').child('expiresAt').val() > now && root.child('quietRooms').child($roomId).child('claims').child($clientId).val() === auth.uid && (data.exists() || !newData.exists() || newData.parent().numChildren() <= 2)",
+            ".validate": "!newData.exists() || (newData.hasChildren(['progress', 'complete', 'lastSeen', 'joinedAt', 'schemaVersion']) && newData.numChildren() === 5 && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 100 && newData.child('complete').isBoolean() && newData.child('lastSeen').isNumber() && newData.child('lastSeen').val() >= now - 3600000 && newData.child('lastSeen').val() <= now + 300000 && newData.child('joinedAt').isNumber() && newData.child('schemaVersion').val() === 1)"
+          }
+        },
+        "claims": {
+          "$clientId": {
+            ".read": "auth != null && data.val() === auth.uid",
+            ".write": "auth != null && root.child('quietRooms').child($roomId).child('meta').child('expiresAt').val() > now && ((!data.exists() && newData.val() === auth.uid && (root.child('quietRooms').child($roomId).child('members').numChildren() < 2 || root.child('quietRooms').child($roomId).child('members').child($clientId).exists())) || (data.val() === auth.uid && (!newData.exists() || newData.val() === auth.uid)))",
+            ".validate": "!newData.exists() || newData.isString()"
+          }
+        }
+      }
+    }
+  }
+}

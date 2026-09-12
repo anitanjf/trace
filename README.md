@@ -15,6 +15,7 @@ Trace is a mindful typing space for seasonal reflection, quiet focus, and progre
 - **Meaningful progress:** Review clarity, pace, consistency, and earned enlightenments without competitive pressure.
 - **Reading comfort:** Adjust typography, text size, spacing, alignment, motion, and appearance.
 - **Cloud sync:** Keep signed-in progress and preferences with Firebase.
+- **Quiet Multiplayer:** Invite one signed-in person into an expiring online room and share only anonymous presence and passage progress.
 
 ## Daily Reflection policy
 
@@ -36,6 +37,8 @@ Trace uses a custom ink-mark favicon, route-aware browser metadata, install meta
 
 1. Clone the repository.
 2. Run `npm install`.
-3. Add the required Firebase values to your local Vite environment.
+3. Copy `.env.example` to `.env` and add the Firebase web app values, including the Realtime Database URL.
 4. Run `npm run dev`.
 5. Use `npm run build` for a production build.
+
+Quiet Multiplayer also requires the reviewed Realtime Database rules in `database.rules.json`. The repository does not deploy them automatically.

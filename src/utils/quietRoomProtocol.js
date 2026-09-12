@@ -1,13 +1,21 @@
 const ROOM_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+export const ROOM_CODE_LENGTH = 8
+export const ROOM_LIFETIME_MS = 4 * 60 * 60 * 1000
+const secureRandom = () => {
+  if (!globalThis.crypto?.getRandomValues) return Math.random()
+  const value = new Uint32Array(1)
+  globalThis.crypto.getRandomValues(value)
+  return value[0] / 2 ** 32
+}
 
 export const normalizeRoomCode = value =>
   String(value || '')
     .toUpperCase()
-    .replace(/[^A-Z0-9]/g, '')
-    .slice(0, 6)
+    .replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, '')
+    .slice(0, ROOM_CODE_LENGTH)
 
-export const createRoomCode = (random = Math.random) =>
-  Array.from({ length: 6 }, () =>
+export const createRoomCode = (random = secureRandom) =>
+  Array.from({ length: ROOM_CODE_LENGTH }, () =>
     ROOM_ALPHABET[Math.floor(random() * ROOM_ALPHABET.length)]
   ).join('')
 
@@ -34,10 +42,19 @@ export const getLatencyTone = latencyMs => {
 }
 
 export const createProgressMessage = ({ clientId, roomCode, progress, complete }) => ({
-  type: 'progress',
   clientId,
   roomCode: normalizeRoomCode(roomCode),
   progress: Math.max(0, Math.min(100, Number(progress) || 0)),
   complete: Boolean(complete),
   sentAt: Date.now()
 })
+
+export const getActiveMembers = (members, now = Date.now(), timeoutMs = 20_000) =>
+  Object.entries(members || {})
+    .filter(([, member]) => member && now - Number(member.lastSeen || 0) < timeoutMs)
+    .map(([id, member]) => ({
+      id,
+      progress: Math.max(0, Math.min(100, Number(member.progress) || 0)),
+      complete: Boolean(member.complete),
+      lastSeen: Number(member.lastSeen) || 0
+    }))

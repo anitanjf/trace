@@ -18,8 +18,8 @@ const routeMetadata = {
     description: 'Settle into a continuous punctuation-free typing practice for calm concentration.'
   },
   QuietMultiplayer: {
-    title: 'Quiet Room Prototype — Trace',
-    description: 'Explore a private, non-competitive two-person typing presence without sharing typed text.'
+    title: 'Quiet Multiplayer — Trace',
+    description: 'Invite one person into a private, non-competitive online typing room without sharing typed text.'
   },
   Archive: {
     title: 'Archive — Trace',

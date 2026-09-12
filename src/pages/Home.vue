@@ -18,9 +18,9 @@ const modeDetails = {
     description: 'Choose 50, 100, or 200 words for a continuous punctuation-free session.'
   },
   multiplayer: {
-    title: 'Multiplayer',
-    description: 'Try a private two-person room where both travelers type the same passage at their own pace. Only anonymous presence and progress marks are shared.',
-    actionLabel: 'Open prototype'
+    title: 'Quiet Multiplayer',
+    description: 'Invite one person into a private online room. You will type the same passage at your own pace while sharing only anonymous presence and progress.',
+    actionLabel: 'Open quiet room'
   }
 }
 
@@ -87,7 +87,7 @@ const lifetimeAccuracy = computed(() => {
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.26] group-hover:opacity-[0.36]' : 'opacity-[0.20] group-hover:opacity-[0.30]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.1deg) scaleX(1.002)' }"></div>
           <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-11 w-full pr-12 flex items-center gap-2 text-left">
             <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">Prototype</span>
+            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">Online</span>
           </button>
           <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
             <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px] opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">i</span>

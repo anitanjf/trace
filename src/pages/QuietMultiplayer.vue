@@ -2,10 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fallbackQuotes } from '../utils/constants'
-import { settings } from '../store'
-import { createRoomCode, calculatePassageProgress, isPassageComplete, normalizeRoomCode } from '../utils/quietRoomProtocol'
+import { currentUser, settings } from '../store'
+import { calculatePassageProgress, isPassageComplete, normalizeRoomCode, ROOM_CODE_LENGTH } from '../utils/quietRoomProtocol'
 import { useQuietRoom } from '../composables/useQuietRoom'
 import InkButton from '../components/ui/InkButton.vue'
+import AuthModal from '../components/AuthModal.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -14,52 +15,82 @@ const typedText = ref('')
 const presenceVisible = ref(true)
 const joinError = ref('')
 const copyState = ref('Copy invitation')
+const passageIndex = ref(0)
+const showAuth = ref(false)
+const pendingAction = ref(null)
 
 const {
   roomCode,
   partner,
   partnerPresent,
-  latencyMs,
   latencyTone,
   connectionState,
+  roomError,
+  isBusy,
+  createRoom: createOnlineRoom,
   joinRoom,
   leaveRoom,
   publishProgress
 } = useQuietRoom()
 
-const passage = computed(() => {
-  const seed = roomCode.value
-    .split('')
-    .reduce((total, character) => total + character.charCodeAt(0), 0)
-  return fallbackQuotes[seed % fallbackQuotes.length] || fallbackQuotes[0]
-})
+const passage = computed(() => fallbackQuotes[passageIndex.value % fallbackQuotes.length] || fallbackQuotes[0])
 const progress = computed(() => calculatePassageProgress(typedText.value, passage.value.text))
 const complete = computed(() => isPassageComplete(typedText.value, passage.value.text))
 const bothComplete = computed(() => complete.value && partnerPresent.value && partner.value?.complete)
+const visibleError = computed(() => joinError.value || roomError.value)
 
 watch([progress, complete], ([nextProgress, nextComplete]) => {
   if (roomCode.value) publishProgress(nextProgress, nextComplete)
 })
 
-const enterRoom = code => {
-  joinError.value = ''
-  const normalized = normalizeRoomCode(code)
-  if (normalized.length !== 6) {
-    joinError.value = 'Enter the full six-character invitation.'
+const describeJoinFailure = result => ({
+  invalid: `Enter the full ${ROOM_CODE_LENGTH}-character invitation.`,
+  missing: 'That invitation could not be found.',
+  expired: 'That room has already returned to stillness.',
+  full: 'This room already holds two travelers.',
+  collision: 'The room could not be formed. Please try once more.',
+  auth: 'Sign in to enter a private online room.'
+}[result?.reason] || result?.message || 'The quiet room could not be opened.')
+
+const finishEntry = result => {
+  if (!result?.ok) {
+    joinError.value = describeJoinFailure(result)
     return
   }
-  if (!joinRoom(normalized)) {
-    joinError.value = 'This browser cannot open a local quiet room.'
-    return
-  }
+  passageIndex.value = result.passageIndex
   typedText.value = ''
-  joinCode.value = normalized
-  router.replace({ query: { ...route.query, room: normalized } })
+  joinCode.value = result.code
+  router.replace({ query: { room: result.code } })
 }
 
-const createRoom = () => enterRoom(createRoomCode())
-const leave = () => {
-  leaveRoom()
+const enterRoom = async code => {
+  joinError.value = ''
+  const normalized = normalizeRoomCode(code)
+  if (normalized.length !== ROOM_CODE_LENGTH) {
+    joinError.value = `Enter the full ${ROOM_CODE_LENGTH}-character invitation.`
+    return
+  }
+  if (!currentUser.value) {
+    pendingAction.value = { type: 'join', code: normalized }
+    showAuth.value = true
+    return
+  }
+  finishEntry(await joinRoom(normalized))
+}
+
+const createRoom = async () => {
+  joinError.value = ''
+  if (!currentUser.value) {
+    pendingAction.value = { type: 'create' }
+    showAuth.value = true
+    return
+  }
+  const nextPassage = Math.floor(Math.random() * fallbackQuotes.length)
+  finishEntry(await createOnlineRoom(nextPassage))
+}
+
+const leave = async () => {
+  await leaveRoom()
   typedText.value = ''
   joinCode.value = ''
   router.replace({ query: {} })
@@ -78,7 +109,16 @@ const copyInvitation = async () => {
 
 onMounted(() => {
   const requestedRoom = normalizeRoomCode(route.query.room)
-  if (requestedRoom.length === 6) enterRoom(requestedRoom)
+  if (requestedRoom.length === ROOM_CODE_LENGTH) void enterRoom(requestedRoom)
+})
+
+watch(currentUser, async user => {
+  if (!user || !pendingAction.value) return
+  const action = pendingAction.value
+  pendingAction.value = null
+  showAuth.value = false
+  if (action.type === 'create') await createRoom()
+  else await enterRoom(action.code)
 })
 </script>
 
@@ -89,7 +129,7 @@ onMounted(() => {
         <div>
           <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">Two currents, one passage</p>
           <h1 class="text-3xl sm:text-4xl tracking-[0.22em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Quiet Room</h1>
-          <p class="mt-3 text-[9px] uppercase tracking-[0.16em] opacity-55">Local two-tab prototype · no cloud room</p>
+          <p class="mt-3 text-[9px] uppercase tracking-[0.16em] opacity-55">Private online room · two travelers</p>
         </div>
         <InkButton variant="ghost" compact class="uppercase tracking-[0.16em] text-[10px]" @click="router.push('/')">Return</InkButton>
       </header>
@@ -97,14 +137,15 @@ onMounted(() => {
       <section v-if="!roomCode" class="relative isolate mx-auto max-w-xl px-6 py-9 sm:px-10 sm:py-12 text-center">
         <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.34]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
         <p class="font-ui-serif text-xl sm:text-2xl leading-relaxed mb-3">Share the page, not the pace.</p>
-        <p class="text-xs leading-relaxed opacity-70 mb-8">Open a room in this browser, then use its invitation in a second tab. Trace shares only anonymous presence and progress—not what either person types.</p>
-        <InkButton variant="primary" block class="uppercase tracking-[0.16em] text-[10px] mb-7" @click="createRoom">Create quiet room</InkButton>
+        <p class="text-xs leading-relaxed opacity-70 mb-3">Create a room and send its private invitation to one person. You will receive the same passage while moving at your own pace.</p>
+        <p class="text-[10px] leading-relaxed opacity-55 mb-8">Sign-in protects the room. Names, typed words, mistakes, WPM, and accuracy never cross the water.</p>
+        <InkButton variant="primary" block class="uppercase tracking-[0.16em] text-[10px] mb-7" :disabled="isBusy" @click="createRoom">{{ isBusy ? 'Opening room…' : 'Create quiet room' }}</InkButton>
         <div class="flex items-stretch gap-2">
           <label class="sr-only" for="quiet-room-code">Invitation code</label>
           <input
             id="quiet-room-code"
             v-model="joinCode"
-            maxlength="6"
+            :maxlength="ROOM_CODE_LENGTH"
             autocomplete="off"
             inputmode="text"
             placeholder="ROOM CODE"
@@ -112,9 +153,9 @@ onMounted(() => {
             :style="{ borderColor: 'var(--trace-border)', color: 'var(--trace-text-primary)' }"
             @keydown.enter="enterRoom(joinCode)"
           />
-          <InkButton variant="soft" compact class="uppercase tracking-[0.12em] text-[10px]" @click="enterRoom(joinCode)">Join</InkButton>
+          <InkButton variant="soft" compact class="uppercase tracking-[0.12em] text-[10px]" :disabled="isBusy" @click="enterRoom(joinCode)">{{ isBusy ? 'Joining…' : 'Join' }}</InkButton>
         </div>
-        <p v-if="joinError" role="alert" class="mt-4 text-xs">{{ joinError }}</p>
+        <p v-if="visibleError" role="alert" class="mt-4 text-xs">{{ visibleError }}</p>
       </section>
 
       <section v-else aria-label="Quiet multiplayer room">
@@ -131,6 +172,7 @@ onMounted(() => {
             <InkButton variant="ghost" compact class="uppercase tracking-[0.12em] text-[9px]" @click="leave">Leave</InkButton>
           </div>
         </div>
+        <p v-if="visibleError" role="alert" class="mb-5 text-xs">{{ visibleError }}</p>
 
         <div class="grid md:grid-cols-[minmax(0,1fr)_15rem] gap-6">
           <div class="relative isolate px-6 py-8 sm:px-10 sm:py-10">
@@ -171,8 +213,8 @@ onMounted(() => {
             </div>
 
             <div class="px-2 py-2 text-[9px] uppercase tracking-[0.13em] opacity-55">
-              <p>Status · {{ connectionState === 'together' ? 'Together' : 'Waiting' }}</p>
-              <p class="mt-2">Distance · {{ latencyTone }}<span v-if="latencyMs !== null"> · {{ latencyMs }}ms</span></p>
+              <p>Status · {{ connectionState === 'together' ? 'Together' : connectionState === 'reconnecting' ? 'Returning' : 'Waiting' }}</p>
+              <p class="mt-2">Signal · {{ latencyTone }}</p>
               <p class="mt-4 normal-case tracking-normal leading-relaxed">No chat, rankings, WPM, accuracy, or typed text is shared.</p>
             </div>
           </aside>
@@ -185,4 +227,5 @@ onMounted(() => {
       </section>
     </div>
   </main>
+  <AuthModal v-if="showAuth" @close="showAuth = false; pendingAction = null" />
 </template>
