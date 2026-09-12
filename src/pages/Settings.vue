@@ -16,9 +16,12 @@ const appearanceOptions = ['system', 'light', 'dark']
 const motionOptions = ['system', 'reduced', 'full']
 const lofiOptions = [
   { id: 'off', label: 'Off', note: 'Silence' },
-  { id: 'tea-house', label: 'Tea House', note: 'Warm and unhurried' },
-  { id: 'moonlit-cafe', label: 'Moonlit Café', note: 'Low, dusky chords' },
-  { id: 'temple-garden', label: 'Temple Garden', note: 'Soft open space' }
+  { id: 'tea-house', label: 'Tea House', note: 'Warm lo-fi hush' },
+  { id: 'moonlit-cafe', label: 'Moonlit Café', note: 'Low, dusky jazz' },
+  { id: 'temple-garden', label: 'Temple Garden', note: 'Open meditative tones' },
+  { id: 'sunlit-desk', label: 'Sunlit Desk', note: 'Cheerful gentle groove' },
+  { id: 'deep-focus', label: 'Deep Focus', note: 'Steady low concentration' },
+  { id: 'still-waters', label: 'Still Waters', note: 'Sparse ambient calm' }
 ]
 
 const activeSeasonIndex = computed(() =>
@@ -27,6 +30,15 @@ const activeSeasonIndex = computed(() =>
     : getRealWorldSeason()
 )
 const activeSeasonName = computed(() => seasons[activeSeasonIndex.value]?.name || seasons[0].name)
+const seasonSoundNotes = [
+  'Soft breeze · distant birds',
+  'Warm air · cicada pulse',
+  'Dry leaves · low wind',
+  'Open wind · glass tones',
+  'Sun-warmed breeze · bamboo taps',
+  'Steady rain · water drops'
+]
+const activeSeasonSound = computed(() => seasonSoundNotes[activeSeasonIndex.value] || seasonSoundNotes[0])
 const availableLockedSeasons = computed(() => seasons.map((season, index) => ({ name: season.name, index })))
 
 const fontClass = computed(() => {
@@ -199,6 +211,7 @@ const chooseSeason = index => {
                 <div>
                   <h3 class="text-xs uppercase tracking-widest">Seasonal ambience</h3>
                   <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1">Now following {{ activeSeasonName }}</p>
+                  <p class="text-[9px] tracking-wide opacity-70 mt-1">{{ activeSeasonSound }}</p>
                 </div>
                 <div class="grid grid-cols-2 gap-1 w-28">
                   <button v-for="option in [false, true]" :key="String(option)" @click="settings.seasonalAmbience = option" :aria-pressed="settings.seasonalAmbience === option" class="relative isolate min-h-10 text-[10px] uppercase group">
@@ -213,7 +226,7 @@ const chooseSeason = index => {
             <fieldset class="relative isolate p-5">
               <legend class="text-xs uppercase tracking-widest px-1">Lo-fi background</legend>
               <span class="absolute inset-0 -z-10 rounded-2xl opacity-20" :class="settings.darkMode ? 'bg-white' : 'bg-stone-300'" style="filter: url(#ink-blot); transform: rotate(0.12deg);"></span>
-              <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1 mb-4">Three gentle stations composed inside Trace</p>
+              <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1 mb-4">Six distinct stations composed inside Trace</p>
               <div class="grid sm:grid-cols-2 gap-2">
                 <button v-for="track in lofiOptions" :key="track.id" @click="settings.lofiTrack = track.id" :aria-pressed="settings.lofiTrack === track.id" class="relative isolate min-h-14 px-3 text-left group">
                   <span class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings.lofiTrack === track.id ? (settings.darkMode ? 'bg-stone-600 opacity-60' : 'bg-stone-400 opacity-45') : 'opacity-0 group-hover:opacity-25 bg-stone-400'" style="filter: url(#ink-blot);"></span>
