@@ -19,6 +19,9 @@ const createSessionId = () =>
 const userInputs = ref([])
 const mobileInputValue = ref('')
 const isComposing = ref(false)
+const isMobileInputFocused = ref(false)
+const restoreMobileFocusAfterPause = ref(false)
+const mobileViewportHeight = ref(null)
 const typedCount = computed(() => userInputs.value.length)
 const missedLetters = ref({})
 const missedWords = ref(new Set())
@@ -83,10 +86,46 @@ const canHandleBoardShortcut = () => {
     typingArea.value?.contains(activeElement)
 }
 
+const updateMobileViewport = () => {
+  const isMobile = window.matchMedia('(max-width: 639px)').matches
+  mobileViewportHeight.value = isMobile
+    ? Math.round(window.visualViewport?.height || window.innerHeight)
+    : null
+}
+
+const ensureActiveLineVisible = async () => {
+  await nextTick()
+  if (!isMobileInputFocused.value || !textContainer.value) return
+  const spans = textContainer.value.querySelectorAll('.char-span')
+  const targetIndex = Math.min(typedCount.value, Math.max(poemCharacters.value.length - 1, 0))
+  spans[targetIndex]?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' })
+}
+
+const focusMobileInput = async () => {
+  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return
+  mobileInputRef.value?.focus({ preventScroll: true })
+  await ensureActiveLineVisible()
+}
+
+const handleMobileFocus = () => {
+  isMobileInputFocused.value = true
+  ensureActiveLineVisible()
+}
+
+const handleMobileBlur = () => {
+  isMobileInputFocused.value = false
+}
+
 const handleResize = () => {
+  updateMobileViewport()
   calculateLines()
   updateCursor()
+  ensureActiveLineVisible()
 }
+
+const mobileViewportStyle = computed(() => ({
+  maxHeight: mobileViewportHeight.value ? `${mobileViewportHeight.value}px` : '100dvh'
+}))
 
 const getSessionElapsedMinutes = (now = Date.now()) => {
   if (!sessionStartTime.value) return 0
@@ -97,10 +136,17 @@ const getSessionElapsedMinutes = (now = Date.now()) => {
 watch(() => props.isPaused, (isNowPaused) => {
   if (isNowPaused) {
     if (sessionStartTime.value && !sessionEndTime.value) pauseStartTime.value = Date.now()
-    if (mobileInputRef.value) mobileInputRef.value.blur()
-  } else if (pauseStartTime.value > 0 && sessionStartTime.value && !sessionEndTime.value) {
-    sessionStartTime.value += Date.now() - pauseStartTime.value
-    pauseStartTime.value = 0
+    restoreMobileFocusAfterPause.value = isMobileInputFocused.value
+    mobileInputRef.value?.blur()
+  } else {
+    if (pauseStartTime.value > 0 && sessionStartTime.value && !sessionEndTime.value) {
+      sessionStartTime.value += Date.now() - pauseStartTime.value
+      pauseStartTime.value = 0
+    }
+    if (restoreMobileFocusAfterPause.value) {
+      restoreMobileFocusAfterPause.value = false
+      nextTick(focusMobileInput)
+    }
   }
 })
 
@@ -463,6 +509,8 @@ const triggerCompletion = () => {
 onMounted(() => {
   window.addEventListener('keydown', handleKey, { passive: false })
   window.addEventListener('resize', handleResize)
+  window.visualViewport?.addEventListener('resize', handleResize)
+  updateMobileViewport()
   
   const enterDelay = props.gameMode === 'flow' ? 300 : 450
 
@@ -478,13 +526,14 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('resize', handleResize)
+  window.visualViewport?.removeEventListener('resize', handleResize)
   clearScheduledTimers()
   typingTimeout = null
 })
 </script>
 
 <template>
-  <div class="w-full max-w-4xl flex flex-col items-center z-10 relative px-4 sm:px-8">
+  <div class="w-full max-w-4xl min-h-0 flex flex-col items-center z-10 relative px-2 sm:px-8 py-3 sm:py-0 overflow-x-hidden overflow-y-auto overscroll-contain" :style="mobileViewportStyle">
     
     <SplashScreen 
       v-if="isTransitioning" 
@@ -501,7 +550,27 @@ onBeforeUnmount(() => {
       </span>
     </div>
 
-    <div class="flex flex-col items-center w-full relative"  ref="typingArea">
+    <button
+      v-if="!isEntering && !isTransitioning && !isSweeping && !isKintsugi"
+      type="button"
+      class="sm:hidden relative z-40 min-h-11 mb-3 px-5 rounded-full border text-[10px] uppercase tracking-[0.18em] font-ui-sans transition-colors"
+      :class="[
+        isMobileInputFocused ? 'border-[#DFBE73] text-[#DFBE73] bg-[#DFBE73]/10' : (settings?.darkMode ? 'border-stone-700 text-stone-300' : 'border-stone-300 text-stone-700'),
+        props.isPaused ? 'opacity-50' : ''
+      ]"
+      :disabled="props.isPaused"
+      :aria-pressed="isMobileInputFocused"
+      aria-controls="mobile-typing-input"
+      @click="focusMobileInput"
+    >
+      {{ isMobileInputFocused ? 'Keyboard ready · Keep typing' : (typedCount > 0 ? 'Tap to continue typing' : 'Tap to type') }}
+    </button>
+
+    <div
+      class="flex flex-col items-center w-full relative rounded-xl ring-1 ring-inset transition-shadow sm:ring-0"
+      :class="isMobileInputFocused ? 'ring-[#DFBE73]/70' : (settings?.darkMode ? 'ring-stone-700/60' : 'ring-stone-300/80')"
+      ref="typingArea"
+    >
       
       <div class="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         <div v-for="spark in keystrokeSparks" :key="spark.id" class="absolute flex items-center justify-center animate-ink-puff" :style="{ left: `${spark.x}px`, top: `${spark.y}px` }">
@@ -519,20 +588,26 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <input 
+      <input
+        id="mobile-typing-input"
         ref="mobileInputRef"
-        type="text" 
+        type="text"
+        inputmode="text"
+        enterkeyhint="done"
+        aria-label="Typing input. Enter the displayed passage."
         v-model="mobileInputValue"
         @input="handleMobileInput"
+        @focus="handleMobileFocus"
+        @blur="handleMobileBlur"
         @compositionstart="handleCompositionStart"
         @compositionend="handleCompositionEnd"
         autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
-        class="absolute inset-0 w-full h-full opacity-0 z-30 cursor-text resize-none" 
+        class="mobile-capture-input absolute inset-0 w-full h-full opacity-0 z-30 cursor-text resize-none" 
         :class="isKintsugi || isTransitioning || isSweeping ? 'pointer-events-none' : 'pointer-events-auto'"
         style="color: transparent; text-shadow: none;"
       />
 
-      <div class="w-[calc(100%+6rem)] px-12 flex-shrink-0 relative transition-all duration-[600ms] ease-in-out py-2" 
+      <div class="w-full px-2 sm:w-[calc(100%+6rem)] sm:px-12 flex-shrink-0 relative transition-all duration-[600ms] ease-in-out py-2" 
            :class="(isKintsugi || isSweeping) ? 'overflow-visible pointer-events-auto' : 'overflow-hidden pointer-events-none'"
            :style="{ 
              maxHeight: viewportMaxHeight, 
@@ -594,6 +669,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.mobile-capture-input:focus-visible { outline: none; }
 .cursor-glide { transition: transform 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out; }
 .firefly-glide { transition: transform 1.5s cubic-bezier(0.2, 1, 0.4, 1), opacity 0.5s ease; will-change: transform; }
 .fireflies-container { position: absolute; width: 0; height: 0; }
