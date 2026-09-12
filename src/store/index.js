@@ -242,12 +242,17 @@ export const recordSession = (session = {}) => {
     id: session.id,
     mode: session.mode || 'meditation',
     completedAt: session.completedAt || Date.now(),
+    elapsedMs: Math.max(0, Number(session.elapsedMs) || 0),
     date,
     season: session.season ?? getRealWorldSeason(),
+    passageId: session.passageId || null,
+    wordCount: Math.max(0, Number(session.wordCount) || 0),
     passageDelta: session.passageDelta || 0,
     dailyDelta: session.dailyDelta || 0,
     keystrokes: session.keystrokes || 0,
-    mistakes: session.mistakes || 0
+    mistakes: session.mistakes || 0,
+    accuracy: Math.max(0, Math.min(100, Number(session.accuracy) || 0)),
+    wpm: Math.max(0, Number(session.wpm) || 0)
   }
   if (!stats.value.activityGrid) stats.value.activityGrid = {}
   stats.value.activityGrid[date] = (stats.value.activityGrid[date] || 0) + 1
