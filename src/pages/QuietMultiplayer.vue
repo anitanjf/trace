@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fallbackQuotes, SEASONS } from '../utils/constants'
+import { fallbackQuotes, seasons } from '../utils/constants'
 import { currentUser, settings } from '../store'
 import { MAX_PLAYERS, MIN_PLAYERS, ROOM_CODE_LENGTH, normalizeRoomCode } from '../utils/quietRoomProtocol'
 import { useQuietRoom } from '../composables/useQuietRoom'
@@ -269,7 +269,7 @@ watch(currentUser, async user => {
         <div v-else-if="isPlaying" class="grid xl:grid-cols-[minmax(0,1fr)_18rem] gap-5 items-start">
           <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.12]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <TypingBoard :quote="passage" :season-name="SEASONS[settings.lockedSeason]?.name || 'Shared Current'" :passage-number="passageIndex + 1" game-mode="multiplayer" @progress="publishProgress" @passage-complete="handleComplete" />
+            <TypingBoard :quote="passage" :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'" :passage-number="passageIndex + 1" game-mode="multiplayer" @progress="publishProgress" @passage-complete="handleComplete" />
           </section>
 
           <aside class="relative isolate px-5 py-6">
@@ -311,6 +311,6 @@ watch(currentUser, async user => {
       </div>
     </div>
 
-    <AuthModal :show="showAuth" @close="showAuth = false; pendingAction = null" />
+    <AuthModal v-if="showAuth" @close="showAuth = false; pendingAction = null" />
   </main>
 </template>
