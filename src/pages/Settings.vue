@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { settings, currentUser } from '../store'
+import { settings } from '../store'
 import { fontOptions, seasons, seasonInkPalette } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
@@ -98,7 +98,7 @@ const chooseSeason = index => {
       </div>
       <button @click="router.push('/')" aria-label="Return to menu" class="relative isolate min-h-11 px-5 group">
         <span
-          class="absolute inset-0 -z-10 rounded-full opacity-90 transition-[background-color,opacity] duration-700 group-hover:opacity-100"
+          class="absolute inset-0 -z-10 rounded-full transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72] group-hover:opacity-[0.82]' : 'opacity-[0.62] group-hover:opacity-[0.72]'"
           :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(-1deg)' }"
         ></span>
         <span class="text-[10px] uppercase tracking-[0.2em] transition-colors duration-700" :style="{ color: activeSeasonInk.color }">Return</span>
@@ -110,7 +110,7 @@ const chooseSeason = index => {
         <button v-for="section in sections" :key="section.id" @click="activeSection = section.id" :aria-pressed="activeSection === section.id" class="relative isolate min-h-14 sm:min-h-16 px-3 sm:px-5 text-left group">
           <span
             class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700"
-            :class="activeSection === section.id ? 'opacity-90' : (settings.darkMode ? 'bg-white opacity-[0.025] group-hover:opacity-[0.06]' : 'bg-stone-950 opacity-[0.035] group-hover:opacity-[0.08]')"
+            :class="activeSection === section.id ? (settings.darkMode ? 'opacity-[0.72] group-hover:opacity-[0.82]' : 'opacity-[0.62] group-hover:opacity-[0.72]') : (settings.darkMode ? 'bg-white opacity-[0.025] group-hover:opacity-[0.06]' : 'bg-stone-950 opacity-[0.035] group-hover:opacity-[0.08]')"
             :style="[selectedSectionBackground(section.id), { filter: 'url(#ink-blot)' }]"
           ></span>
           <span
@@ -129,7 +129,7 @@ const chooseSeason = index => {
       <section class="relative isolate flex-1 min-w-0 min-h-0 transition-colors duration-700" :style="{ color: activeSeasonInk.color }">
         <span
           aria-hidden="true"
-          class="absolute inset-0 -z-10 rounded-3xl opacity-[0.96] transition-[background-color] duration-700"
+          class="absolute inset-0 -z-10 rounded-3xl transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72]' : 'opacity-[0.62]'"
           :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(0.08deg) scale(0.995)' }"
         ></span>
         <div class="h-full overflow-y-auto no-scrollbar px-5 py-7 sm:px-8 sm:py-8">
@@ -305,6 +305,5 @@ const chooseSeason = index => {
       </section>
     </div>
 
-    <p class="text-center text-[9px] uppercase tracking-widest opacity-50 mt-6 sm:mt-7" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">{{ currentUser ? 'Preferences sync with your account.' : 'Saved on this device. Sign in to sync across devices.' }}</p>
   </main>
 </template>
