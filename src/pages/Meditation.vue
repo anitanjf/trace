@@ -14,6 +14,7 @@ import { getRealWorldSeason } from '../utils/helpers'
 const router = useRouter()
 const quotes = ref([])
 const currentIndex = ref(0)
+const archiveReplay = ref(null)
 const gameState = ref('loading')
 const showAuthModal = ref(false)
 
@@ -34,19 +35,45 @@ const checkAuthGuard = () => {
   return true
 }
 
+const consumeArchiveReplay = () => {
+  try {
+    const storedReplay = sessionStorage.getItem('trace:archive-replay')
+    if (!storedReplay) return null
+    sessionStorage.removeItem('trace:archive-replay')
+    const replay = JSON.parse(storedReplay)
+    if (!replay?.text) return null
+    return { text: replay.text, author: replay.author || 'Unknown', archiveId: replay.id }
+  } catch {
+    sessionStorage.removeItem('trace:archive-replay')
+    return null
+  }
+}
+
 const initGame = async () => {
   if (!checkAuthGuard()) return 
   
   gameState.value = 'loading'
   try {
-    quotes.value = await fetchPassages()
-    
+    const fetchedQuotes = await fetchPassages()
     const seasonalPassageCount = stats.value.seasonal[activeVisualIndex.value]?.passages || 0
-    currentIndex.value = seasonalPassageCount % quotes.value.length
+    const replayingArchive = Boolean(archiveReplay.value)
+
+    if (replayingArchive) {
+      const replay = archiveReplay.value
+      quotes.value = [
+        replay,
+        ...fetchedQuotes.filter(quote => quote.text !== replay.text || quote.author !== replay.author)
+      ]
+      currentIndex.value = 0
+    } else {
+      quotes.value = fetchedQuotes
+      currentIndex.value = seasonalPassageCount % fetchedQuotes.length
+    }
+
     displayPassageNumber.value = seasonalPassageCount + 1
-    
     isFirstCompletionOfPassage.value = true
-    isCurrentQuoteArchived.value = false
+    isCurrentQuoteArchived.value = replayingArchive
+    archiveReplay.value = null
     setTimeout(() => { gameState.value = 'playing' }, 1500)
   } catch (error) {
     console.error("Failed to load passages", error)
@@ -66,6 +93,7 @@ const handleGlobalKey = (e) => {
 
 onMounted(() => {
   window.addEventListener('keydown', handleGlobalKey)
+  archiveReplay.value = consumeArchiveReplay()
   initGame()
 })
 
