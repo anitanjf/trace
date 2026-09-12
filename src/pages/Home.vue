@@ -20,15 +20,16 @@ const modeDetails = {
   multiplayer: {
     title: 'Quiet Multiplayer',
     description: 'Invite one person into a private online room. You will type the same passage at your own pace while sharing only anonymous presence and progress.',
-    actionLabel: 'Open quiet room'
+    actionLabel: 'Open quiet room',
+    routeName: 'QuietMultiplayer'
   }
 }
 
 const openModeInfo = mode => { activeModeInfo.value = modeDetails[mode] }
-const handleModeAction = () => {
-  const isMultiplayer = activeModeInfo.value === modeDetails.multiplayer
+const handleModeAction = async () => {
+  const routeName = activeModeInfo.value?.routeName
   activeModeInfo.value = null
-  if (isMultiplayer) router.push('/multiplayer')
+  if (routeName) await router.push({ name: routeName })
 }
 
 const lifetimeAccuracy = computed(() => {
