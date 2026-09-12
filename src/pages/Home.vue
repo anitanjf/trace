@@ -5,7 +5,24 @@ import { stats, settings } from '../store'
 import ComingSoonModal from '../components/ComingSoonModal.vue'
 
 const router = useRouter()
-const showMultiplayerModal = ref(false)
+const activeModeInfo = ref(null)
+
+const modeDetails = {
+  daily: {
+    title: 'Daily Reflection',
+    description: 'Complete one shared passage each day and return tomorrow for another.'
+  },
+  flow: {
+    title: 'Flow State',
+    description: 'Choose 50, 100, or 200 words for a continuous punctuation-free session.'
+  },
+  multiplayer: {
+    title: 'Multiplayer',
+    description: 'A quiet shared typing experience is being prepared. Check back soon to practice with fellow travelers.'
+  }
+}
+
+const openModeInfo = mode => { activeModeInfo.value = modeDetails[mode] }
 
 const lifetimeAccuracy = computed(() => {
   if (stats.value.lifetimeKeystrokes === 0) return null
@@ -16,7 +33,7 @@ const lifetimeAccuracy = computed(() => {
 
 <template>
   <main class="z-10 flex flex-col items-center w-full max-w-2xl mx-auto my-auto gap-8 py-8 sm:py-12 px-4 sm:px-6 transition-all duration-700" :class="[
-      { 'blur-sm opacity-40 scale-95 pointer-events-none': showMultiplayerModal },
+      { 'blur-sm opacity-40 scale-95 pointer-events-none': activeModeInfo },
       settings?.darkMode ? 'text-stone-300' : 'text-stone-800'
     ]">
     <header class="text-center">
@@ -39,24 +56,32 @@ const lifetimeAccuracy = computed(() => {
       </button>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <button aria-describedby="daily-description" @click="router.push('/daily')" class="relative isolate min-h-28 p-5 text-left group">
+        <div class="relative isolate min-h-20 p-4 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.2deg);"></div>
-          <span class="relative z-10 block text-sm tracking-[0.2em] uppercase font-ui-serif mb-2" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</span>
-          <span id="daily-description" class="relative z-10 block text-xs leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">Complete one shared passage each day and return tomorrow for another.</span>
-        </button>
-        <button aria-describedby="flow-description" @click="router.push('/flow')" class="relative isolate min-h-28 p-5 text-left group">
+          <div class="relative z-10 min-h-12 flex items-center gap-2">
+            <button @click="router.push('/daily')" class="min-h-11 flex-1 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</button>
+            <button @click="openModeInfo('daily')" type="button" aria-label="About Daily Reflection" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
+          </div>
+        </div>
+
+        <div class="relative isolate min-h-20 p-4 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(-0.2deg);"></div>
-          <span class="relative z-10 block text-sm tracking-[0.2em] uppercase font-ui-serif mb-2" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</span>
-          <span id="flow-description" class="relative z-10 block text-xs leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">Choose 50, 100, or 200 words for a continuous punctuation-free session.</span>
-        </button>
-        <button aria-describedby="multiplayer-description" @click="showMultiplayerModal = true" class="relative isolate min-h-28 p-5 text-left group">
+          <div class="relative z-10 min-h-12 flex items-center gap-2">
+            <button @click="router.push('/flow')" class="min-h-11 flex-1 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</button>
+            <button @click="openModeInfo('flow')" type="button" aria-label="About Flow State" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
+          </div>
+        </div>
+
+        <div class="relative isolate min-h-20 p-4 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings?.darkMode ? 'bg-white opacity-5 group-hover:opacity-10' : 'bg-stone-300 opacity-35 group-hover:opacity-50'" style="filter: url(#ink-blot); transform: rotate(0.15deg);"></div>
-          <span class="relative z-10 flex items-center gap-2 mb-2">
-            <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans" :class="settings?.darkMode ? 'border-stone-600 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">Soon</span>
-          </span>
-          <span id="multiplayer-description" class="relative z-10 block text-xs leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">A quiet shared typing experience is being prepared.</span>
-        </button>
+          <div class="relative z-10 min-h-12 flex items-center gap-2">
+            <button @click="openModeInfo('multiplayer')" class="min-h-11 flex-1 flex items-center gap-2 text-left">
+              <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
+              <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans" :class="settings?.darkMode ? 'border-stone-600 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'">Soon</span>
+            </button>
+            <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="w-11 h-11 flex-shrink-0 rounded-full border flex items-center justify-center font-ui-serif text-sm" :class="settings?.darkMode ? 'border-stone-700 text-[#DFBE73]' : 'border-stone-400 text-[#6f4d0f]'"><span aria-hidden="true">i</span></button>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -91,5 +116,10 @@ const lifetimeAccuracy = computed(() => {
       <p class="sm:hidden text-[10px] text-center uppercase tracking-widest leading-relaxed opacity-50 font-ui-sans">Tap a passage to open your keyboard.<br>Rotate your device if you need more room.</p>
     </footer>
   </main>
-  <ComingSoonModal v-if="showMultiplayerModal" @close="showMultiplayerModal = false" />
+  <ComingSoonModal
+    v-if="activeModeInfo"
+    :title="activeModeInfo.title"
+    :description="activeModeInfo.description"
+    @close="activeModeInfo = null"
+  />
 </template>
