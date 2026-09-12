@@ -372,7 +372,7 @@ export const initStore = () => {
     if (parsedSettings.seasonalAmbience === undefined) parsedSettings.seasonalAmbience = parsedSettings.ambienceMode !== undefined && parsedSettings.ambienceMode !== 'off'
     parsedSettings.seasonalAmbience = Boolean(parsedSettings.seasonalAmbience)
     parsedSettings.ambientVolume = Math.min(1, Math.max(0, Number(parsedSettings.ambientVolume ?? 0.35)))
-    if (!['off', 'tea-house', 'moonlit-cafe', 'temple-garden'].includes(parsedSettings.lofiTrack)) parsedSettings.lofiTrack = 'off'
+    if (!['off', 'tea-house', 'moonlit-cafe', 'temple-garden', 'sunlit-desk', 'deep-focus', 'still-waters'].includes(parsedSettings.lofiTrack)) parsedSettings.lofiTrack = 'off'
     parsedSettings.lofiVolume = Math.min(1, Math.max(0, Number(parsedSettings.lofiVolume ?? 0.25)))
     parsedSettings.keystrokeSound = Boolean(parsedSettings.keystrokeSound)
     parsedSettings.keystrokeVolume = Math.min(1, Math.max(0, Number(parsedSettings.keystrokeVolume ?? 0.45)))

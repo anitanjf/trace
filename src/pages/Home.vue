@@ -32,7 +32,7 @@ const lifetimeAccuracy = computed(() => {
 </script>
 
 <template>
-  <main class="z-10 flex flex-col items-center w-full max-w-2xl mx-auto my-auto gap-8 py-8 sm:py-12 px-4 sm:px-6 transition-all duration-700" :class="[
+  <main class="z-10 flex flex-col items-center w-full max-w-2xl mx-auto my-0 sm:my-auto gap-8 pt-8 pb-24 sm:py-12 px-4 sm:px-6 transition-all duration-700" :class="[
       { 'blur-sm opacity-40 scale-95 pointer-events-none': activeModeInfo },
       settings?.darkMode ? 'text-stone-300' : 'text-stone-800'
     ]">
