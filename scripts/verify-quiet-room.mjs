@@ -1,61 +1,40 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
 import {
-  calculatePassageProgress,
-  createProgressMessage,
-  createRoomCode,
-  getActiveMembers,
-  getLatencyTone,
-  isPassageComplete,
-  normalizeRoomCode,
-  ROOM_CODE_LENGTH,
-  ROOM_LIFETIME_MS
+  canJoinRoom,
+  findOpenSeat,
+  getConnectedPlayers,
+  getRoomPlayers,
+  isRoomExpired,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_GRACE_MS,
+  ROOM_SLOTS
 } from '../src/utils/quietRoomProtocol.js'
 
-assert.equal(normalizeRoomCode(' ab-c23-de! '), 'ABC23DE')
-assert.equal(createRoomCode(() => 0), '2'.repeat(ROOM_CODE_LENGTH))
-assert.equal(ROOM_CODE_LENGTH, 8)
-assert.equal(ROOM_LIFETIME_MS, 14_400_000)
-assert.equal(calculatePassageProgress('quiet', 'quiet water'), 45)
-assert.equal(calculatePassageProgress('quxet', 'quiet water'), 36)
-assert.equal(isPassageComplete('quiet', 'quiet'), true)
-assert.equal(isPassageComplete('quiet ', 'quiet'), false)
-assert.equal(getLatencyTone(Number.NaN), 'Listening')
-assert.equal(getLatencyTone(80), 'Near')
-assert.equal(getLatencyTone(180), 'Gentle delay')
-assert.equal(getLatencyTone(420), 'Distant')
+assert.equal(MIN_PLAYERS, 2)
+assert.equal(MAX_PLAYERS, 5)
+assert.deepEqual(ROOM_SLOTS, ['one', 'two', 'three', 'four', 'five'])
 
-const message = createProgressMessage({
-  clientId: 'private-client',
-  roomCode: 'abc23456',
-  progress: 130,
-  complete: true
-})
-assert.deepEqual(
-  Object.keys(message).sort(),
-  ['clientId', 'complete', 'progress', 'roomCode', 'sentAt'].sort()
-)
-assert.equal(message.progress, 100)
-assert.equal(message.roomCode, 'ABC23456')
-assert.equal('typedText' in message, false)
-assert.equal('keystrokes' in message, false)
-assert.equal('uid' in message, false)
+const now = 100_000
+const room = {
+  meta: { status: 'lobby', expiresAt: now + 60_000, hostDisconnectedAt: null },
+  players: {
+    one: { uid: 'host', connected: true, lastSeen: now },
+    two: { uid: 'guest', connected: false, disconnectedAt: now - 10_000 }
+  }
+}
 
-const active = getActiveMembers({
-  first: { progress: 32, complete: false, lastSeen: 99_000 },
-  second: { progress: 140, complete: true, lastSeen: 98_000 },
-  stale: { progress: 70, complete: false, lastSeen: 70_000 }
-}, 100_000, 20_000)
-assert.deepEqual(active, [
-  { id: 'first', progress: 32, complete: false, lastSeen: 99_000 },
-  { id: 'second', progress: 100, complete: true, lastSeen: 98_000 }
-])
+assert.equal(getRoomPlayers(room.players, now).length, 2, 'grace-period seat remains reserved')
+assert.equal(getConnectedPlayers(room.players).length, 1)
+assert.equal(findOpenSeat(room.players, now), 'three')
+assert.equal(canJoinRoom(room, 'new-user', now), true)
 
-const databaseRulesSource = readFileSync(new URL('../database.rules.json', import.meta.url), 'utf8')
-const databaseRules = JSON.parse(databaseRulesSource)
-assert.equal(databaseRulesSource.includes('numChildren'), false)
-assert.ok(databaseRules.rules.quietRooms.$roomId.members.$slot)
-assert.ok(databaseRules.rules.quietRooms.$roomId.claims.$slot)
-assert.ok(databaseRules.rules.quietRooms.$roomId.claims.$slot['.write'].includes('now - 24000'))
+room.meta.hostDisconnectedAt = now - ROOM_GRACE_MS - 1
+assert.equal(isRoomExpired(room.meta, now), true)
+assert.equal(canJoinRoom(room, 'new-user', now), false)
 
-console.log('Trace online quiet-room protocol checks passed.')
+room.meta.hostDisconnectedAt = null
+room.players.two.disconnectedAt = now - ROOM_GRACE_MS - 1
+assert.equal(findOpenSeat(room.players, now), 'two', 'stale seat can be reclaimed')
+
+console.log('Shared Current protocol checks passed.')
