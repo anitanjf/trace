@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="title description">
+  <title id="title">Trace — Mindful Typing</title>
+  <desc id="description">A calm parchment card with the Trace wordmark, ink circle, seasonal marks, and the phrase Leave your mark gently.</desc>
+  <defs>
+    <filter id="paper" x="-8%" y="-12%" width="116%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency=".012 .035" numOctaves="2" seed="17" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="10"/>
+    </filter>
+    <filter id="softShadow" x="-20%" y="-25%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#302219" flood-opacity=".12"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="630" fill="#F5EFE6"/>
+  <circle cx="115" cy="96" r="10" fill="#E7C3C8" opacity=".72"/>
+  <circle cx="1055" cy="126" r="8" fill="#CCDAB8" opacity=".72"/>
+  <path d="M105 512c22-18 44-18 66 0-20 19-43 19-66 0Z" fill="#C9AA8D" opacity=".55" transform="rotate(-18 138 512)"/>
+  <path d="M1014 500c22-18 44-18 66 0-20 19-43 19-66 0Z" fill="#8FA7C2" opacity=".52" transform="rotate(16 1047 500)"/>
+
+  <g filter="url(#softShadow)">
+    <rect x="210" y="124" width="780" height="382" rx="42" fill="#E9DCCB" opacity=".82" filter="url(#paper)"/>
+  </g>
+
+  <g transform="translate(302 197)">
+    <path d="M116 8c-30-31-82-31-114 1-37 37-30 100 14 128 38 24 90 12 113-27" fill="none" stroke="#302219" stroke-width="10" stroke-linecap="round" opacity=".88"/>
+    <path d="M33 38h69M68 38v82" stroke="#302219" stroke-width="11" stroke-linecap="round"/>
+    <circle cx="126" cy="83" r="5" fill="#302219" opacity=".6"/>
+  </g>
+
+  <text x="514" y="278" fill="#302219" font-family="Georgia, 'Times New Roman', serif" font-size="82" font-weight="600" letter-spacing="25">TRACE</text>
+  <text x="519" y="326" fill="#654B38" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" letter-spacing="10">LEAVE YOUR MARK GENTLY</text>
+  <text x="519" y="391" fill="#51443B" font-family="Arial, Helvetica, sans-serif" font-size="22">A mindful typing space for rhythm, reflection, and flow.</text>
+
+  <g transform="translate(519 438)">
+    <rect width="46" height="5" rx="2.5" fill="#E7C3C8"/>
+    <rect x="60" width="46" height="5" rx="2.5" fill="#CCDAB8"/>
+    <rect x="120" width="46" height="5" rx="2.5" fill="#C9AA8D"/>
+    <rect x="180" width="46" height="5" rx="2.5" fill="#CBD9E2"/>
+    <rect x="240" width="46" height="5" rx="2.5" fill="#D8C893"/>
+    <rect x="300" width="46" height="5" rx="2.5" fill="#8FA7C2"/>
+  </g>
+</svg>
