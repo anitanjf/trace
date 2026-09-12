@@ -4,12 +4,14 @@ import ZenLoader from './components/ZenLoader.vue'
 import SyncStatus from './components/SyncStatus.vue'
 import { isAppReady, settings, shouldReduceMotion } from './store'
 import { useAppAudio } from './composables/useAudio'
+import { useTraceTheme } from './composables/useTraceTheme'
 
 useAppAudio()
+const { themeStyle } = useTraceTheme()
 </script>
 
 <template>
-  <div class="min-h-[100dvh] flex flex-col items-center justify-center select-none overflow-x-hidden overflow-y-auto relative font-ui-serif" :class="{ 'reduce-motion': shouldReduceMotion() }">
+  <div class="trace-app min-h-[100dvh] flex flex-col items-center justify-center select-none overflow-x-hidden overflow-y-auto relative font-ui-serif" :class="{ 'reduce-motion': shouldReduceMotion() }" :style="themeStyle">
     
     <!-- 1. Atmosphere is ALWAYS rendered instantly using the local cache -->
     <Atmosphere />
@@ -39,23 +41,6 @@ useAppAudio()
         </div>
       </div>
     </transition>
-
-    <!-- GOOGLE FONTS INJECTION -->
-    <component :is="'style'">
-      @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=Courier+Prime&family=Plus+Jakarta+Sans:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600&family=Cinzel:wght@400;500;600&family=Questrial&family=Zhi+Mang+Xing&family=Yuji+Syuku&display=swap');
-      
-      .font-ui-serif { font-family: 'Cormorant Garamond', serif !important; }
-      .font-ui-sans { font-family: 'Plus Jakarta Sans', sans-serif !important; }
-      
-      .poem-text-calligraphy { font-family: 'Playfair Display', serif !important; letter-spacing: 0.08em !important; }
-      .poem-text-minimalist { font-family: 'Questrial', sans-serif !important; letter-spacing: 0.06em !important; }
-      .poem-text-mono { font-family: 'Courier Prime', monospace !important; letter-spacing: 0.05em !important; }
-      .poem-text-antique { font-family: 'Cinzel', serif !important; letter-spacing: 0.08em !important; }
-      .poem-text-classic { font-family: 'Cormorant Garamond', serif !important; letter-spacing: 0.06em !important; }
-      .poem-text-modern { font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.04em !important; }
-      .poem-text-brush { font-family: 'Zhi Mang Xing', cursive !important; letter-spacing: 0.05em !important; }
-      .poem-text-sumi { font-family: 'Yuji Syuku', serif !important; letter-spacing: 0.05em !important; }
-    </component>
 
     <SyncStatus />
   </div>
