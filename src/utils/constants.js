@@ -7,6 +7,15 @@ export const seasons = [
   { name: 'Wet Season', bgColor: 'bg-[#A3B1C6]', darkBgColor: 'bg-[#1e2430]', particleClass: 'text-white/60 dark:text-blue-200/40 drop-container', textDark: 'text-slate-900' }
 ]
 
+export const seasonInkPalette = [
+  { light: '#E7C3C8', dark: '#65484D', lightText: '#2C1D20', darkText: '#FAF8F5' },
+  { light: '#CCDAB8', dark: '#46533C', lightText: '#25301F', darkText: '#FAF8F5' },
+  { light: '#C9AA8D', dark: '#654B38', lightText: '#302219', darkText: '#FAF8F5' },
+  { light: '#CBD9E2', dark: '#465867', lightText: '#1F2933', darkText: '#FAF8F5' },
+  { light: '#D8C893', dark: '#62573A', lightText: '#2D271A', darkText: '#FAF8F5' },
+  { light: '#8FA7C2', dark: '#44556C', lightText: '#17202B', darkText: '#FAF8F5' }
+]
+
 export const fontOptions = [
   { id: 'calligraphy', label: 'Calligraphy' }, 
   { id: 'minimalist', label: 'Minimalist' },   

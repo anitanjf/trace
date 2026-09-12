@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { settings, currentUser } from '../store'
-import { fontOptions, seasons } from '../utils/constants'
+import { fontOptions, seasons, seasonInkPalette } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
 const router = useRouter()
@@ -39,14 +39,6 @@ const seasonSoundNotes = [
   'Steady rain · water drops'
 ]
 const activeSeasonSound = computed(() => seasonSoundNotes[activeSeasonIndex.value] || seasonSoundNotes[0])
-const seasonInkPalette = [
-  { light: '#E7C3C8', dark: '#65484D', lightText: '#2C1D20', darkText: '#FAF8F5' },
-  { light: '#CCDAB8', dark: '#46533C', lightText: '#25301F', darkText: '#FAF8F5' },
-  { light: '#C9AA8D', dark: '#654B38', lightText: '#302219', darkText: '#FAF8F5' },
-  { light: '#CBD9E2', dark: '#465867', lightText: '#1F2933', darkText: '#FAF8F5' },
-  { light: '#D8C893', dark: '#62573A', lightText: '#2D271A', darkText: '#FAF8F5' },
-  { light: '#8FA7C2', dark: '#44556C', lightText: '#17202B', darkText: '#FAF8F5' }
-]
 const activeSeasonInk = computed(() => {
   const palette = seasonInkPalette[activeSeasonIndex.value] || seasonInkPalette[0]
   return {
@@ -105,8 +97,11 @@ const chooseSeason = index => {
         <h1 class="text-3xl sm:text-4xl tracking-[0.28em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Preferences</h1>
       </div>
       <button @click="router.push('/')" aria-label="Return to menu" class="relative isolate min-h-11 px-5 group">
-        <span class="absolute inset-0 -z-10 rounded-full transition-opacity group-hover:opacity-100" :class="settings.darkMode ? 'bg-stone-700 opacity-45' : 'bg-stone-950 opacity-90'" style="filter: url(#ink-blot); transform: rotate(-1deg);"></span>
-        <span class="text-[10px] uppercase tracking-[0.2em] text-stone-100">Return</span>
+        <span
+          class="absolute inset-0 -z-10 rounded-full opacity-90 transition-[background-color,opacity] duration-700 group-hover:opacity-100"
+          :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(-1deg)' }"
+        ></span>
+        <span class="text-[10px] uppercase tracking-[0.2em] transition-colors duration-700" :style="{ color: activeSeasonInk.color }">Return</span>
       </button>
     </header>
 
