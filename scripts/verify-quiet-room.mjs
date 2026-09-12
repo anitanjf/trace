@@ -56,5 +56,6 @@ const databaseRules = JSON.parse(databaseRulesSource)
 assert.equal(databaseRulesSource.includes('numChildren'), false)
 assert.ok(databaseRules.rules.quietRooms.$roomId.members.$slot)
 assert.ok(databaseRules.rules.quietRooms.$roomId.claims.$slot)
+assert.ok(databaseRules.rules.quietRooms.$roomId.claims.$slot['.write'].includes('now - 24000'))
 
 console.log('Trace online quiet-room protocol checks passed.')

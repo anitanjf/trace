@@ -19,7 +19,7 @@ import {
 } from '../utils/quietRoomProtocol'
 
 const HEARTBEAT_MS = 8_000
-const PEER_TIMEOUT_MS = 20_000
+const PEER_TIMEOUT_MS = 24_000
 const PROGRESS_THROTTLE_MS = 180
 
 const createClientId = () =>
@@ -123,9 +123,9 @@ export const useQuietRoom = () => {
     }
 
     const members = (await get(membersRef).catch(() => null))?.val() || {}
-    if (Object.keys(members).some(key => key === 'one') && Object.keys(members).some(key => key === 'two')) {
-      return { ok: false, reason: 'full' }
-    }
+    const activeSlots = getActiveMembers(members, Date.now(), PEER_TIMEOUT_MS)
+      .filter(member => member.id === 'one' || member.id === 'two')
+    if (activeSlots.length >= 2) return { ok: false, reason: 'full' }
     throw lastError || new Error('The quiet room could not be joined.')
   }
 
