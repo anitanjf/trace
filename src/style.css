@@ -1,12 +1,99 @@
-/* 1. Imports MUST be at the absolute top of the file */
-@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300&family=Courier+Prime&family=Plus+Jakarta+Sans:wght@300;400;500&family=Playfair+Display:ital,wght@0,400;0,500;0,600&family=Cinzel:wght@400;500;600&family=Questrial&family=Zhi+Mang+Xing&family=Yuji+Syuku&display=swap');
 @import "tailwindcss";
 
-/* 2. Global body styles using @apply work here because Tailwind is imported right above */
+:root {
+  color-scheme: light dark;
+
+  /* Typography */
+  --trace-font-display: 'Cormorant Garamond', serif;
+  --trace-font-passage: 'Cormorant Garamond', serif;
+  --trace-font-control: 'Plus Jakarta Sans', sans-serif;
+
+  /* Surfaces and type are resolved by useTraceTheme at the app boundary. */
+  --trace-paper: #fdfbf7;
+  --trace-paper-raised: #faf7f1;
+  --trace-panel: #e7c3c8;
+  --trace-panel-strong: #e7c3c8;
+  --trace-text-primary: #1c1917;
+  --trace-text-secondary: #44403c;
+  --trace-text-muted: #78716c;
+  --trace-border: rgba(41, 37, 36, 0.18);
+  --trace-focus: #65484d;
+  --trace-season-ink: #e7c3c8;
+  --trace-season-contrast: #2c1d20;
+  --trace-season-accent: #65484d;
+
+  /* Spacing */
+  --trace-space-1: 0.25rem;
+  --trace-space-2: 0.5rem;
+  --trace-space-3: 0.75rem;
+  --trace-space-4: 1rem;
+  --trace-space-5: 1.25rem;
+  --trace-space-6: 1.5rem;
+  --trace-space-8: 2rem;
+  --trace-space-10: 2.5rem;
+
+  /* Shape and motion */
+  --trace-radius-control: 0.75rem;
+  --trace-radius-panel: 1.5rem;
+  --trace-control-height: 2.75rem;
+  --trace-control-height-compact: 2.5rem;
+  --trace-duration-fast: 180ms;
+  --trace-duration-calm: 700ms;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
 body {
-  @apply bg-slate-900 text-slate-100 overflow-hidden;
-  background-image: 
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 30px 30px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--trace-paper);
+  color: var(--trace-text-primary);
+  font-family: var(--trace-font-passage);
+}
+
+.trace-app {
+  background: var(--trace-paper);
+  color: var(--trace-text-primary);
+  transition:
+    color var(--trace-duration-calm) ease,
+    background-color var(--trace-duration-calm) ease;
+}
+
+.font-ui-serif {
+  font-family: var(--trace-font-display) !important;
+}
+
+.font-ui-sans {
+  font-family: var(--trace-font-control) !important;
+}
+
+.poem-text-calligraphy { font-family: 'Playfair Display', serif !important; letter-spacing: 0.08em !important; }
+.poem-text-minimalist { font-family: 'Questrial', sans-serif !important; letter-spacing: 0.06em !important; }
+.poem-text-mono { font-family: 'Courier Prime', monospace !important; letter-spacing: 0.05em !important; }
+.poem-text-antique { font-family: 'Cinzel', serif !important; letter-spacing: 0.08em !important; }
+.poem-text-classic { font-family: 'Cormorant Garamond', serif !important; letter-spacing: 0.06em !important; }
+.poem-text-modern { font-family: 'Plus Jakarta Sans', sans-serif !important; letter-spacing: 0.04em !important; }
+.poem-text-brush { font-family: 'Zhi Mang Xing', cursive !important; letter-spacing: 0.05em !important; }
+.poem-text-sumi { font-family: 'Yuji Syuku', serif !important; letter-spacing: 0.05em !important; }
+
+:where(button, a, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--trace-focus);
+  outline-offset: 4px;
+  border-radius: var(--trace-radius-control);
+}
+
+:where(button, input, textarea, select):disabled {
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --trace-duration-fast: 1ms;
+    --trace-duration-calm: 1ms;
+  }
 }
