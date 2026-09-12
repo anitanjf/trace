@@ -1,9 +1,16 @@
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fallbackQuotes, seasons } from '../utils/constants'
 import { currentUser, settings } from '../store'
-import { MAX_PLAYERS, MIN_PLAYERS, ROOM_CODE_LENGTH, normalizeRoomCode } from '../utils/quietRoomProtocol'
+import {
+  buildSharedPassage,
+  MAX_PLAYERS,
+  MIN_PLAYERS,
+  ROOM_CODE_LENGTH,
+  WORD_COUNTS,
+  normalizeRoomCode
+} from '../utils/quietRoomProtocol'
 import { useQuietRoom } from '../composables/useQuietRoom'
 import InkButton from '../components/ui/InkButton.vue'
 import AuthModal from '../components/AuthModal.vue'
@@ -15,9 +22,12 @@ const joinCode = ref('')
 const joinError = ref('')
 const copyState = ref('Copy invitation')
 const passageIndex = ref(0)
+const selectedWordCount = ref(50)
 const showAuth = ref(false)
 const pendingAction = ref(null)
 const showEndedModal = ref(false)
+const countdown = ref(0)
+let countdownTimer = null
 
 const {
   roomCode,
@@ -32,7 +42,6 @@ const {
   canStart,
   roomError,
   isBusy,
-  connectionState,
   createRoom: createOnlineRoom,
   joinRoom,
   joinPublicRoom,
@@ -43,12 +52,32 @@ const {
   publishProgress
 } = useQuietRoom()
 
-const passage = computed(() => fallbackQuotes[passageIndex.value % fallbackQuotes.length] || fallbackQuotes[0])
+const passage = computed(() => {
+  if (room.value?.meta?.passageText) {
+    return {
+      text: room.value.meta.passageText,
+      author: room.value.meta.passageAuthor || 'A Shared Breath'
+    }
+  }
+  return fallbackQuotes[passageIndex.value % fallbackQuotes.length] || fallbackQuotes[0]
+})
 const visibleError = computed(() => joinError.value || roomError.value)
 const lobbyCount = computed(() => connectedPlayers.value.length)
 const isPrivate = computed(() => room.value?.meta?.type === 'private')
-const countdown = ref(0)
-let countdownTimer = null
+const roomWordCount = computed(() => Number(room.value?.meta?.wordCount) || selectedWordCount.value)
+const finishers = computed(() => [...players.value].sort((a, b) => {
+  if (a.complete !== b.complete) return a.complete ? -1 : 1
+  if (a.complete && b.complete) return Number(a.finishedAt || Infinity) - Number(b.finishedAt || Infinity)
+  return Number(b.progress || 0) - Number(a.progress || 0)
+}))
+
+const fireflyColors = {
+  one: '#F2B8C6',
+  two: '#A8D5BA',
+  three: '#F3D28A',
+  four: '#9CC7E8',
+  five: '#C6AFE5'
+}
 
 watch(hasEnded, ended => {
   if (ended && room.value?.meta?.endedReason === 'traveler-left') showEndedModal.value = true
@@ -81,6 +110,7 @@ const finishEntry = result => {
     return
   }
   passageIndex.value = result.passageIndex
+  selectedWordCount.value = Number(room.value?.meta?.wordCount) || selectedWordCount.value
   joinCode.value = result.code
   router.replace({ query: { room: result.code } })
 }
@@ -90,6 +120,16 @@ const withAuth = action => {
   pendingAction.value = action
   showAuth.value = true
   return true
+}
+
+const passageOptions = () => {
+  const seed = Math.floor(Math.random() * 10_000)
+  const generated = buildSharedPassage(fallbackQuotes, selectedWordCount.value, seed)
+  return {
+    wordCount: selectedWordCount.value,
+    passageText: generated.text,
+    passageAuthor: generated.author
+  }
 }
 
 const enterRoom = async code => {
@@ -106,13 +146,13 @@ const enterRoom = async code => {
 const createPrivate = async () => {
   joinError.value = ''
   if (withAuth({ type: 'private' })) return
-  finishEntry(await createOnlineRoom(Math.floor(Math.random() * fallbackQuotes.length), 'private'))
+  finishEntry(await createOnlineRoom(Math.floor(Math.random() * fallbackQuotes.length), 'private', passageOptions()))
 }
 
 const findPublic = async () => {
   joinError.value = ''
   if (withAuth({ type: 'public' })) return
-  finishEntry(await joinPublicRoom(Math.floor(Math.random() * fallbackQuotes.length)))
+  finishEntry(await joinPublicRoom(Math.floor(Math.random() * fallbackQuotes.length), passageOptions()))
 }
 
 const returnHome = async () => {
@@ -138,26 +178,23 @@ const copyInvitation = async () => {
   window.setTimeout(() => { copyState.value = 'Copy invitation' }, 2200)
 }
 
-const playerTone = player => {
-  if (player.complete) return 'Mark placed'
-  if (player.connected === false) return 'Returning…'
-  if (player.progress > 0) return 'Moving gently'
-  return 'Ready'
+const handleComplete = () => {
+  publishProgress({ progress: 100, complete: true })
 }
 
-const handleComplete = stats => {
-  publishProgress({ progress: 100, complete: true })
-  return stats
-}
+const fireflyStyle = player => ({
+  left: 'clamp(0.5rem, ' + Math.max(2, Math.min(98, Number(player.progress) || 0)) + '%, calc(100% - 0.5rem))',
+  top: (18 + players.value.findIndex(entry => entry.seat === player.seat) * 13) + '%',
+  color: fireflyColors[player.seat]
+})
 
 onMounted(async () => {
   const requested = normalizeRoomCode(route.query.room)
-  if (requested.length === ROOM_CODE_LENGTH) {
-    await enterRoom(requested)
-  } else if (currentUser.value) {
-    finishEntry(await resumeRoom())
-  }
+  if (requested.length === ROOM_CODE_LENGTH) await enterRoom(requested)
+  else if (currentUser.value) finishEntry(await resumeRoom())
 })
+
+onBeforeUnmount(() => clearInterval(countdownTimer))
 
 watch(currentUser, async user => {
   if (!user) return
@@ -179,7 +216,7 @@ watch(currentUser, async user => {
     <div class="mx-auto w-full max-w-6xl">
       <header class="flex items-start justify-between gap-5 mb-8 sm:mb-10">
         <div>
-          <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">Many currents · one passage</p>
+          <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">Many lights · one passage</p>
           <h1 class="text-3xl sm:text-4xl tracking-[0.2em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Shared Current</h1>
           <p class="mt-3 text-[9px] uppercase tracking-[0.16em] opacity-55">A gentle typing match · two to five travelers</p>
         </div>
@@ -188,25 +225,36 @@ watch(currentUser, async user => {
 
       <section v-if="!roomCode" class="mx-auto max-w-3xl">
         <div class="relative isolate px-6 py-8 sm:px-10 sm:py-11 text-center mb-6">
-          <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.28]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+          <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.25]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
           <p class="font-ui-serif text-xl sm:text-2xl leading-relaxed mb-3">Move together. Arrive in your own rhythm.</p>
-          <p class="mx-auto max-w-xl text-xs leading-relaxed opacity-70">Everyone receives the same passage. The room shares only gentle progress and finishing order—never typed words, mistakes, accuracy, or WPM.</p>
+          <p class="mx-auto max-w-xl text-xs leading-relaxed opacity-70">Choose the length of your shared breath. Each colored firefly shows a traveler’s place without turning the practice into pressure.</p>
         </div>
+
+        <fieldset class="mb-6">
+          <legend class="w-full text-center text-[9px] uppercase tracking-[0.24em] opacity-55 mb-4">Choose a shared breath</legend>
+          <div class="grid grid-cols-3 gap-3">
+            <button v-for="count in WORD_COUNTS" :key="count" type="button" class="relative isolate min-h-16 px-3 transition-transform hover:scale-[1.01]" :aria-pressed="selectedWordCount === count" @click="selectedWordCount = count">
+              <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl transition-opacity" :class="selectedWordCount === count ? 'opacity-30' : 'opacity-[0.1]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+              <span class="block font-ui-serif text-base">{{ count }}</span>
+              <span class="block mt-1 text-[8px] uppercase tracking-[0.14em] opacity-50">{{ count === 50 ? 'Short breath' : count === 100 ? 'Steady breath' : 'Deep exhale' }}</span>
+            </button>
+          </div>
+        </fieldset>
 
         <div class="grid sm:grid-cols-2 gap-4 mb-6">
           <article class="relative isolate px-6 py-7 min-h-48 flex flex-col">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.18]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
             <p class="text-[9px] uppercase tracking-[0.22em] opacity-55 mb-3">Private room</p>
             <h2 class="font-ui-serif text-xl mb-2">Invite your circle</h2>
-            <p class="text-xs leading-relaxed opacity-65 mb-6">Create a room, invite up to four people, and begin when at least two are present.</p>
+            <p class="text-xs leading-relaxed opacity-65 mb-6">Create a {{ selectedWordCount }}-word room, invite up to four people, and begin when at least two are present.</p>
             <InkButton variant="primary" block class="mt-auto uppercase tracking-[0.14em] text-[10px]" :disabled="isBusy" @click="createPrivate">{{ isBusy ? 'Opening…' : 'Create private room' }}</InkButton>
           </article>
 
           <article class="relative isolate px-6 py-7 min-h-48 flex flex-col">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.12]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
             <p class="text-[9px] uppercase tracking-[0.22em] opacity-55 mb-3">Public room</p>
-            <h2 class="font-ui-serif text-xl mb-2">Join the gathering current</h2>
-            <p class="text-xs leading-relaxed opacity-65 mb-6">Enter the oldest open room. A calm countdown begins with two travelers and welcomes up to five.</p>
+            <h2 class="font-ui-serif text-xl mb-2">Join the gathering light</h2>
+            <p class="text-xs leading-relaxed opacity-65 mb-6">Match only with travelers who chose {{ selectedWordCount }} words. The oldest compatible lobby is filled first.</p>
             <InkButton variant="soft" block class="mt-auto uppercase tracking-[0.14em] text-[10px]" :disabled="isBusy" @click="findPublic">{{ isBusy ? 'Listening…' : 'Find public room' }}</InkButton>
           </article>
         </div>
@@ -225,7 +273,7 @@ watch(currentUser, async user => {
       <section v-else>
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
-            <p class="text-[8px] uppercase tracking-[0.22em] opacity-50">{{ isPrivate ? 'Private invitation' : 'Public gathering' }}</p>
+            <p class="text-[8px] uppercase tracking-[0.22em] opacity-50">{{ isPrivate ? 'Private invitation' : 'Public gathering' }} · {{ roomWordCount }} words</p>
             <p class="mt-1 text-lg tracking-[0.3em] font-ui-serif">{{ roomCode }}</p>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -237,13 +285,11 @@ watch(currentUser, async user => {
 
         <div v-if="isLobby" class="grid lg:grid-cols-[minmax(0,1fr)_19rem] gap-6">
           <div class="relative isolate px-6 py-8 sm:px-10 sm:py-10">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.25]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <p class="text-[9px] uppercase tracking-[0.24em] opacity-55 mb-4">{{ isPrivate ? 'Private lobby' : 'Public matchmaking' }}</p>
-            <h2 class="font-ui-serif text-2xl sm:text-3xl leading-relaxed mb-3">{{ lobbyCount < MIN_PLAYERS ? 'Waiting beside the water' : 'The passage is ready' }}</h2>
-            <p class="text-xs leading-relaxed opacity-65 max-w-xl">
-              {{ isPrivate ? 'Invite travelers with the code above. The host may begin once two or more are present.' : (countdown ? 'The shared passage opens in ' + countdown + '…' : 'The room will begin gently once another traveler arrives.') }}
-            </p>
-            <div class="mt-8 flex flex-wrap gap-3">
+            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.24]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <p class="text-[9px] uppercase tracking-[0.24em] opacity-55 mb-4">{{ isPrivate ? 'Private lobby' : roomWordCount + '-word public lobby' }}</p>
+            <h2 class="font-ui-serif text-2xl sm:text-3xl leading-relaxed mb-3">{{ lobbyCount < MIN_PLAYERS ? 'Waiting for another light' : 'The passage is ready' }}</h2>
+            <p class="text-xs leading-relaxed opacity-65 max-w-xl">{{ isPrivate ? 'Invite travelers with the code above. The host may begin once two or more are present.' : (countdown ? 'The shared passage opens in ' + countdown + '…' : 'A calm countdown begins when another traveler arrives.') }}</p>
+            <div class="mt-8">
               <InkButton v-if="isPrivate && isHost" variant="primary" :disabled="!canStart" class="uppercase tracking-[0.14em] text-[10px]" @click="startMatch">{{ canStart ? 'Begin shared passage' : 'Waiting for one more' }}</InkButton>
               <span v-else class="text-[10px] uppercase tracking-[0.16em] opacity-55">{{ isPrivate ? 'The host will begin' : 'Matchmaking remains open to five' }}</span>
             </div>
@@ -255,48 +301,52 @@ watch(currentUser, async user => {
             <ol class="space-y-3">
               <li v-for="index in MAX_PLAYERS" :key="index" class="flex items-center justify-between gap-3 min-h-8 text-xs">
                 <template v-if="players[index - 1]">
-                  <span class="font-ui-serif tracking-wide">{{ players[index - 1].name }} <small v-if="players[index - 1].seat === localSeat" class="opacity-50">(you)</small></span>
-                  <span class="text-[8px] uppercase tracking-[0.12em] opacity-45">{{ playerTone(players[index - 1]) }}</span>
+                  <span class="flex items-center gap-2 font-ui-serif tracking-wide"><i class="w-2 h-2 rounded-full firefly-idle" :style="{ color: fireflyColors[players[index - 1].seat], backgroundColor: fireflyColors[players[index - 1].seat] }"></i>{{ players[index - 1].name }} <small v-if="players[index - 1].seat === localSeat" class="opacity-50">(you)</small></span>
+                  <span class="text-[8px] uppercase tracking-[0.12em] opacity-45">{{ players[index - 1].connected === false ? 'Returning…' : 'Ready' }}</span>
                 </template>
-                <template v-else>
-                  <span class="opacity-30">An open place</span><span class="w-2 h-2 rounded-full opacity-20" :style="{ backgroundColor: 'var(--trace-season-ink)' }"></span>
-                </template>
+                <template v-else><span class="opacity-30">An open place</span></template>
               </li>
             </ol>
           </aside>
         </div>
 
-        <div v-else-if="isPlaying" class="grid xl:grid-cols-[minmax(0,1fr)_18rem] gap-5 items-start">
-          <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.12]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <TypingBoard :quote="passage" :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'" :passage-number="passageIndex + 1" game-mode="multiplayer" @progress="publishProgress" @passage-complete="handleComplete" />
+        <div v-else-if="isPlaying">
+          <section class="relative isolate mb-4 px-5 py-5 sm:px-8">
+            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.11]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <div class="flex items-center justify-between gap-4 mb-3">
+              <p class="text-[8px] uppercase tracking-[0.22em] opacity-50">Firefly passage · {{ roomWordCount }} words</p>
+              <p class="text-[8px] uppercase tracking-[0.16em] opacity-40">The light nearest dawn arrives first</p>
+            </div>
+            <div class="firefly-field" aria-label="Live multiplayer positions">
+              <div class="absolute left-3 top-0 bottom-0 w-px opacity-20" :style="{ backgroundColor: 'var(--trace-text-primary)' }"></div>
+              <div class="absolute right-3 top-0 bottom-0 w-px opacity-25" :style="{ backgroundColor: 'var(--trace-season-ink)' }"></div>
+              <div v-for="player in players" :key="player.seat" class="race-firefly" :style="fireflyStyle(player)" :title="player.name + (player.seat === localSeat ? ' (you)' : '')">
+                <span class="race-firefly-glow"></span>
+                <span class="race-firefly-core"></span>
+                <span class="race-firefly-name">{{ player.name }}<small v-if="player.seat === localSeat"> · you</small></span>
+              </div>
+            </div>
           </section>
 
-          <aside class="relative isolate px-5 py-6">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.16]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <p class="text-[9px] uppercase tracking-[0.2em] opacity-55 mb-5">Shared current</p>
-            <ol class="space-y-5">
-              <li v-for="player in players" :key="player.seat">
-                <div class="flex justify-between gap-3 text-[10px] mb-2">
-                  <span class="font-ui-serif tracking-wide">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-50">(you)</small></span>
-                  <span class="opacity-55">{{ Math.round(player.progress || 0) }}%</span>
-                </div>
-                <div class="h-[3px] overflow-hidden rounded-full" :style="{ backgroundColor: 'var(--trace-border)' }">
-                  <div class="h-full transition-[width] duration-500" :style="{ width: (player.progress || 0) + '%', backgroundColor: 'var(--trace-season-ink)' }"></div>
-                </div>
-                <p class="mt-2 text-[8px] uppercase tracking-[0.13em] opacity-40">{{ playerTone(player) }}</p>
-              </li>
-            </ol>
-            <p class="mt-7 text-[9px] leading-relaxed opacity-45">Progress is shared. Your words, speed, accuracy, and mistakes remain private.</p>
-          </aside>
+          <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
+            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.1]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <TypingBoard :quote="passage" :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'" :passage-number="roomWordCount" game-mode="multiplayer" @progress="publishProgress" @passage-complete="handleComplete" />
+          </section>
         </div>
 
         <div v-else-if="hasEnded && room?.meta?.endedReason === 'complete'" class="relative isolate mx-auto max-w-2xl px-7 py-12 text-center">
-          <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.25]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-          <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">Passage complete</p>
+          <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.23]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+          <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">All lights have arrived</p>
           <h2 class="font-ui-serif text-2xl sm:text-3xl mb-3">Many marks, one quiet page.</h2>
-          <p class="text-xs opacity-65 mb-8">The order is remembered only for this moment. The practice belongs equally to every traveler.</p>
-          <InkButton variant="primary" @click="leave">Return to the gathering</InkButton>
+          <ol class="mx-auto max-w-sm my-8 space-y-3 text-left">
+            <li v-for="(player, index) in finishers" :key="player.seat" class="flex items-center gap-3 text-sm">
+              <span class="w-6 text-center font-ui-serif opacity-50">{{ index + 1 }}</span>
+              <i class="w-2.5 h-2.5 rounded-full firefly-idle" :style="{ color: fireflyColors[player.seat], backgroundColor: fireflyColors[player.seat] }"></i>
+              <span class="font-ui-serif">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-50">(you)</small></span>
+            </li>
+          </ol>
+          <p class="text-xs opacity-60 mb-8">The order belongs only to this moment. The practice remains equal.</p>
+          <InkButton variant="primary" @click="leave">Return to multiplayer</InkButton>
         </div>
       </section>
     </div>
@@ -305,8 +355,8 @@ watch(currentUser, async user => {
       <div class="relative isolate w-full max-w-md px-8 py-10 text-center" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
         <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-95" :style="{ backgroundColor: 'var(--trace-season-soft)', filter: 'url(#ink-blot)' }"></span>
         <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">The current has changed</p>
-        <h2 id="ended-title" class="font-ui-serif text-2xl leading-relaxed mb-4">One traveler left the river. The shared passage returns to stillness.</h2>
-        <p class="text-xs leading-relaxed opacity-65 mb-8">No progress was lost from your own practice. Gather again when the water is ready.</p>
+        <h2 id="ended-title" class="font-ui-serif text-2xl leading-relaxed mb-4">One light left the path. The shared passage returns to stillness.</h2>
+        <p class="text-xs leading-relaxed opacity-65 mb-8">No progress was lost from your own practice. Gather again when the evening is ready.</p>
         <InkButton variant="primary" @click="leave">Return to multiplayer</InkButton>
       </div>
     </div>
@@ -314,3 +364,61 @@ watch(currentUser, async user => {
     <AuthModal v-if="showAuth" @close="showAuth = false; pendingAction = null" />
   </main>
 </template>
+
+<style scoped>
+.firefly-field {
+  position: relative;
+  height: 8.5rem;
+  overflow: hidden;
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at 78% 45%, color-mix(in srgb, var(--trace-season-ink) 13%, transparent), transparent 28%),
+    linear-gradient(90deg, transparent, color-mix(in srgb, var(--trace-season-ink) 7%, transparent));
+}
+.race-firefly {
+  position: absolute;
+  width: 0;
+  height: 0;
+  transition: left 520ms cubic-bezier(.2,.8,.2,1);
+}
+.race-firefly-core {
+  position: absolute;
+  width: .48rem;
+  height: .48rem;
+  left: -.24rem;
+  top: -.24rem;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 .35rem .08rem currentColor;
+}
+.race-firefly-glow {
+  position: absolute;
+  width: 1.4rem;
+  height: 1.4rem;
+  left: -.7rem;
+  top: -.7rem;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: .16;
+  filter: blur(.18rem);
+  animation: multiplayer-pulse 2.8s ease-in-out infinite;
+}
+.race-firefly-name {
+  position: absolute;
+  left: .65rem;
+  top: -.55rem;
+  white-space: nowrap;
+  font-size: .48rem;
+  letter-spacing: .08em;
+  opacity: .65;
+}
+.race-firefly-name small { opacity: .65; }
+.firefly-idle { box-shadow: 0 0 .45rem currentColor; animation: multiplayer-pulse 2.8s ease-in-out infinite; }
+@keyframes multiplayer-pulse {
+  0%, 100% { opacity: .35; transform: scale(.85); }
+  50% { opacity: .95; transform: scale(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .race-firefly, .race-firefly-glow, .firefly-idle { transition: none; animation: none; }
+}
+</style>
