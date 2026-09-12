@@ -167,6 +167,43 @@ const chooseSeason = (index) => {
         </div>
         <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
 
+        <!-- Optional audio -->
+        <div class="flex flex-col gap-5">
+          <div class="flex flex-col">
+            <span class="text-sm tracking-widest uppercase transition-colors" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Soundscape</span>
+            <span class="text-xs uppercase tracking-wide mt-1 opacity-75" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Optional audio for quiet practice</span>
+          </div>
+
+          <fieldset class="flex flex-col gap-3">
+            <legend class="text-xs uppercase tracking-wider" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Ambience</legend>
+            <div class="grid grid-cols-3 gap-2">
+              <button v-for="mode in ['off', 'rain', 'room']" :key="mode" @click="settings.ambienceMode = mode" type="button" class="min-h-11 rounded-lg px-2 text-xs uppercase tracking-wide" :class="settings.ambienceMode === mode ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-300' : 'text-stone-700')" :aria-pressed="settings.ambienceMode === mode">{{ mode }}</button>
+            </div>
+            <label class="flex items-center justify-between text-[11px] uppercase tracking-wider" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">
+              <span>Ambience volume</span>
+              <output>{{ Math.round(settings.ambientVolume * 100) }}%</output>
+            </label>
+            <input v-model.number.lazy="settings.ambientVolume" type="range" min="0" max="1" step="0.05" :disabled="settings.ambienceMode === 'off'" aria-label="Ambience volume" class="w-full accent-[#b7791f] disabled:opacity-30" />
+          </fieldset>
+
+          <fieldset class="flex flex-col gap-3">
+            <legend class="text-xs uppercase tracking-wider" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-700'">Keystrokes</legend>
+            <div class="grid grid-cols-2 gap-2">
+              <button @click="settings.keystrokeSound = false" type="button" class="min-h-11 rounded-lg px-2 text-xs uppercase tracking-wide" :class="!settings.keystrokeSound ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-300' : 'text-stone-700')" :aria-pressed="!settings.keystrokeSound">Off</button>
+              <button @click="settings.keystrokeSound = true" type="button" class="min-h-11 rounded-lg px-2 text-xs uppercase tracking-wide" :class="settings.keystrokeSound ? (settings.darkMode ? 'bg-stone-600 text-white' : 'bg-stone-300 text-stone-900') : (settings.darkMode ? 'text-stone-300' : 'text-stone-700')" :aria-pressed="settings.keystrokeSound">On</button>
+            </div>
+            <label class="flex items-center justify-between text-[11px] uppercase tracking-wider" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-700'">
+              <span>Keystroke volume</span>
+              <output>{{ Math.round(settings.keystrokeVolume * 100) }}%</output>
+            </label>
+            <input v-model.number.lazy="settings.keystrokeVolume" type="range" min="0" max="1" step="0.05" :disabled="!settings.keystrokeSound" aria-label="Keystroke volume" class="w-full accent-[#b7791f] disabled:opacity-30" />
+          </fieldset>
+
+          <p class="text-[10px] leading-relaxed uppercase tracking-wider opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Sound begins only after you interact and pauses when Trace is hidden.</p>
+        </div>
+
+        <div class="w-full h-[1px] opacity-20 my-1 flex-shrink-0" :class="settings.darkMode ? 'bg-stone-500' : 'bg-stone-800'"></div>
+
         <!-- Atmosphere -->
         <div class="flex flex-col gap-3">
           <div class="flex flex-col">

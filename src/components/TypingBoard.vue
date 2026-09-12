@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { settings, shouldReduceMotion } from '../store'
+import { playKeystrokeSound, setPracticeAudioPaused } from '../composables/useAudio'
 import SplashScreen from './SplashScreen.vue'
 
 const props = defineProps({ 
@@ -134,6 +135,7 @@ const getSessionElapsedMinutes = (now = Date.now()) => {
 }
 
 watch(() => props.isPaused, (isNowPaused) => {
+  setPracticeAudioPaused(isNowPaused)
   if (isNowPaused) {
     if (sessionStartTime.value && !sessionEndTime.value) pauseStartTime.value = Date.now()
     restoreMobileFocusAfterPause.value = isMobileInputFocused.value
@@ -148,7 +150,7 @@ watch(() => props.isPaused, (isNowPaused) => {
       nextTick(focusMobileInput)
     }
   }
-})
+}, { immediate: true })
 
 watch(userInputs, (newVal) => {
   mobileInputValue.value = newVal.join('')
@@ -326,6 +328,7 @@ const processCharacter = (char) => {
   if (!sessionStartTime.value) sessionStartTime.value = Date.now()
 
   sessionKeystrokes.value++
+  playKeystrokeSound({ mistake: char !== expectedChar })
   userInputs.value.push(char)
 
   if (char === expectedChar) {
@@ -366,15 +369,17 @@ const processCharacter = (char) => {
 
 const processBackspace = (isCtrl) => {
   if (!checkCanBackspace()) return
+  const previousLength = userInputs.value.length
   if (isCtrl) {
     if (userInputs.value.length > 0) {
       let lastChar = userInputs.value[userInputs.value.length - 1]
-      if (lastChar === ' ') userInputs.value.pop() 
+      if (lastChar === ' ') userInputs.value.pop()
       while (userInputs.value.length > 0 && userInputs.value[userInputs.value.length - 1] !== ' ') userInputs.value.pop()
     }
   } else {
     if (userInputs.value.length > 0) userInputs.value.pop()
   }
+  if (userInputs.value.length < previousLength) playKeystrokeSound({ backspace: true })
   updateCursor()
 }
 
@@ -530,6 +535,7 @@ onBeforeUnmount(() => {
   window.visualViewport?.removeEventListener('resize', handleResize)
   clearScheduledTimers()
   typingTimeout = null
+  setPracticeAudioPaused(false)
 })
 </script>
 
