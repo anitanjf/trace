@@ -326,7 +326,7 @@ export const useQuietRoom = () => {
     }
   }
 
-  const createRoom = async (passageIndex, type = 'private') => {
+  const createRoom = async (passageIndex, type = 'private', options = {}) => {
     roomError.value = ''
     if (!auth.currentUser) return { ok: false, reason: 'auth' }
     isBusy.value = true
@@ -341,6 +341,9 @@ export const useQuietRoom = () => {
             type,
             status: 'lobby',
             passageIndex: Math.max(0, Number(passageIndex) || 0),
+            wordCount: Number(options.wordCount) || 50,
+            passageText: String(options.passageText || ''),
+            passageAuthor: String(options.passageAuthor || 'A Shared Breath'),
             minPlayers: MIN_PLAYERS,
             maxPlayers: MAX_PLAYERS,
             createdAt: now,
@@ -357,7 +360,7 @@ export const useQuietRoom = () => {
         const result = await runTransaction(target, current => current ? undefined : initial, { applyLocally: false })
         if (!result.committed) continue
         if (type === 'public') {
-          await set(databaseRef(rtdb, openPath(code)), { createdAt: now })
+          await set(databaseRef(rtdb, openPath(code)), { createdAt: now, wordCount: Number(options.wordCount) || 50 })
         }
         return await joinRoom(code)
       }
@@ -370,12 +373,13 @@ export const useQuietRoom = () => {
     }
   }
 
-  const joinPublicRoom = async passageIndex => {
+  const joinPublicRoom = async (passageIndex, options = {}) => {
     if (!auth.currentUser) return { ok: false, reason: 'auth' }
     isBusy.value = true
     try {
       const openSnapshot = await get(databaseRef(rtdb, 'publicMultiplayerRooms'))
       const entries = Object.entries(openSnapshot.val() || {})
+        .filter(([, entry]) => Number(entry?.wordCount) === Number(options.wordCount))
         .sort((a, b) => Number(a[1]?.createdAt || 0) - Number(b[1]?.createdAt || 0))
 
       for (const [code] of entries) {
@@ -385,7 +389,7 @@ export const useQuietRoom = () => {
           await remove(databaseRef(rtdb, openPath(code))).catch(() => {})
         }
       }
-      return await createRoom(passageIndex, 'public')
+      return await createRoom(passageIndex, 'public', options)
     } finally {
       isBusy.value = false
     }
@@ -411,6 +415,7 @@ export const useQuietRoom = () => {
       update(databaseRef(rtdb, roomPath(roomCode.value) + '/players/' + localSeat.value), {
         progress: Math.max(0, Math.min(100, Number(progress) || 0)),
         complete: Boolean(complete),
+        finishedAt: complete ? serverTimestamp() : null,
         lastSeen: serverTimestamp()
       }).catch(error => { roomError.value = friendlyError(error) })
     }, PROGRESS_THROTTLE_MS)

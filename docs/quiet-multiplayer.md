@@ -1,33 +1,25 @@
 # Shared Current multiplayer
 
-Shared Current replaces the original two-person Quiet Room prototype.
+Shared Current is a gentle competitive typing mode for 2–5 signed-in travelers.
 
-## Experience
+## Match lengths
 
-- Private rooms support 2–5 signed-in travelers. The host invites by code and starts the passage.
-- Public matchmaking places travelers into the oldest open lobby. A 12-second calm countdown begins at two players and the lobby remains open up to five.
-- Every traveler uses the real Trace TypingBoard with the same passage.
-- Only anonymous seat name, presence, percentage, and completion are synchronized. Typed text, mistakes, WPM, and accuracy remain private.
-- An active match continues while at least two players remain. If only one remains, everyone sees an ink-mark ending message.
+Players choose Short Breath (50 words), Steady Breath (100 words), or Deep Exhale (200 words).
 
-## Free-plan lifecycle
+- A private-room host chooses the length for everyone invited.
+- Public matchmaking only groups players who selected the same word count.
+- The exact generated passage is stored in the room so every browser receives identical text.
 
-Realtime Database presence marks a traveler disconnected even after a crash or dropped connection. A room reserves that seat for 30 seconds.
+## Race language
 
-The creator can return through Home → Multiplayer or the invitation URL during this grace period. After 30 seconds:
+The numeric progress bars were removed. Each participant is represented by a distinct colored firefly moving toward dawn. Finishing order appears only after all remaining players finish. Typed words, WPM, accuracy, and mistakes never leave the player's browser.
 
-- security rules reject new seat claims;
-- the UI treats the room as nonexistent;
-- public matchmaking ignores it;
-- any connected client removes the expired record.
+## Lifecycle
 
-If every browser is offline, physical deletion waits for the next client cleanup. Logical expiration still prevents the room from being joined.
+A disconnected seat remains reserved for 30 seconds. Returning through Home → Multiplayer or the invitation link resumes that seat. After the grace period, rules reject new claims and clients ignore the expired room. Connected clients remove expired records opportunistically.
 
-## Required Firebase setup
+An active match ends with an ink-mark message when fewer than two connected travelers remain.
 
-1. Enable a sign-in provider (Google is already used by Trace).
-2. Set the regional Realtime Database URL in the production environment.
-3. Publish database.rules.json in Realtime Database → Rules.
-4. Do not paste these rules into Firestore.
+## Firebase
 
-The rules use five fixed seats and do not use numChildren().
+Publish database.rules.json under Realtime Database → Rules. These are not Firestore rules. The rules use five fixed seats and do not use numChildren().

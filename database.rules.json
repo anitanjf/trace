@@ -2,7 +2,6 @@
   "rules": {
     ".read": false,
     ".write": false,
-
     "activeMultiplayer": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
@@ -10,26 +9,20 @@
         ".validate": "!newData.exists() || (newData.hasChildren(['code', 'touchedAt']) && newData.child('code').isString() && newData.child('code').val().length === 7)"
       }
     },
-
     "publicMultiplayerRooms": {
       ".read": "auth != null",
       "$roomId": {
         ".write": "auth != null",
-        ".validate": "!newData.exists() || newData.child('createdAt').isNumber()"
+        ".validate": "!newData.exists() || (newData.child('createdAt').isNumber() && (newData.child('wordCount').val() === 50 || newData.child('wordCount').val() === 100 || newData.child('wordCount').val() === 200))"
       }
     },
-
     "multiplayerRooms": {
       "$roomId": {
         ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && newData.child('meta/hostUid').val() === auth.uid) || (data.exists() && !newData.exists() && (data.child('meta/hostUid').val() === auth.uid || (data.child('meta/hostDisconnectedAt').isNumber() && now > data.child('meta/hostDisconnectedAt').val() + 30000) || now > data.child('meta/expiresAt').val())))",
-
         "meta": {
-          ".validate": "newData.hasChildren(['hostUid', 'type', 'status', 'passageIndex', 'minPlayers', 'maxPlayers', 'createdAt', 'expiresAt', 'schemaVersion']) && newData.child('hostUid').isString() && (newData.child('type').val() === 'private' || newData.child('type').val() === 'public') && (newData.child('status').val() === 'lobby' || newData.child('status').val() === 'playing' || newData.child('status').val() === 'ended') && newData.child('minPlayers').val() === 2 && newData.child('maxPlayers').val() === 5 && newData.child('schemaVersion').val() === 2 && (!data.exists() || (newData.child('hostUid').val() === data.child('hostUid').val() && newData.child('type').val() === data.child('type').val() && newData.child('passageIndex').val() === data.child('passageIndex').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('expiresAt').val() === data.child('expiresAt').val()))",
-
-          "status": {
-            ".write": "auth != null && (root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/one/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/two/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/three/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/four/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/five/uid').val() === auth.uid)"
-          },
+          ".validate": "newData.hasChildren(['hostUid', 'type', 'status', 'passageIndex', 'wordCount', 'passageText', 'passageAuthor', 'minPlayers', 'maxPlayers', 'createdAt', 'expiresAt', 'schemaVersion']) && newData.child('hostUid').isString() && (newData.child('type').val() === 'private' || newData.child('type').val() === 'public') && (newData.child('status').val() === 'lobby' || newData.child('status').val() === 'playing' || newData.child('status').val() === 'ended') && (newData.child('wordCount').val() === 50 || newData.child('wordCount').val() === 100 || newData.child('wordCount').val() === 200) && newData.child('passageText').isString() && newData.child('passageText').val().length > 0 && newData.child('passageText').val().length <= 2400 && newData.child('passageAuthor').isString() && newData.child('minPlayers').val() === 2 && newData.child('maxPlayers').val() === 5 && newData.child('schemaVersion').val() === 2 && (!data.exists() || (newData.child('hostUid').val() === data.child('hostUid').val() && newData.child('type').val() === data.child('type').val() && newData.child('passageIndex').val() === data.child('passageIndex').val() && newData.child('wordCount').val() === data.child('wordCount').val() && newData.child('passageText').val() === data.child('passageText').val() && newData.child('passageAuthor').val() === data.child('passageAuthor').val() && newData.child('createdAt').val() === data.child('createdAt').val() && newData.child('expiresAt').val() === data.child('expiresAt').val()))",
+          "status": { ".write": "auth != null && (root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/one/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/two/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/three/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/four/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/five/uid').val() === auth.uid)" },
           "startedAt": { ".write": "auth != null" },
           "startsAt": { ".write": "auth != null" },
           "endedAt": { ".write": "auth != null" },
@@ -39,11 +32,10 @@
             ".validate": "!newData.exists() || newData.isNumber()"
           }
         },
-
         "players": {
           "$seat": {
             ".write": "auth != null && ($seat === 'one' || $seat === 'two' || $seat === 'three' || $seat === 'four' || $seat === 'five') && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)) || (data.child('connected').val() === false && data.child('disconnectedAt').isNumber() && now > data.child('disconnectedAt').val() + 30000 && newData.child('uid').val() === auth.uid) || (!newData.exists() && root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid)) && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() !== 'ended' && now < root.child('multiplayerRooms/' + $roomId + '/meta/expiresAt').val() && (!root.child('multiplayerRooms/' + $roomId + '/meta/hostDisconnectedAt').isNumber() || now <= root.child('multiplayerRooms/' + $roomId + '/meta/hostDisconnectedAt').val() + 30000)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'connected', 'joinedAt', 'lastSeen', 'progress', 'complete', 'finishOrder']) && newData.child('uid').isString() && newData.child('name').isString() && newData.child('connected').isBoolean() && newData.child('joinedAt').isNumber() && newData.child('lastSeen').isNumber() && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 100 && newData.child('complete').isBoolean() && newData.child('finishOrder').isNumber())"
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'connected', 'joinedAt', 'lastSeen', 'progress', 'complete', 'finishOrder']) && newData.child('uid').isString() && newData.child('name').isString() && newData.child('connected').isBoolean() && newData.child('joinedAt').isNumber() && newData.child('lastSeen').isNumber() && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 100 && newData.child('complete').isBoolean() && newData.child('finishOrder').isNumber() && (!newData.child('finishedAt').exists() || newData.child('finishedAt').isNumber()))"
           }
         }
       }
