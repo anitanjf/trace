@@ -58,6 +58,12 @@ const selectedSectionBackground = sectionId =>
   activeSection.value === sectionId ? { backgroundColor: activeSeasonInk.value.backgroundColor } : undefined
 const selectedSectionText = sectionId =>
   activeSection.value === sectionId ? { color: activeSeasonInk.value.color } : undefined
+const selectedControlInk = selected => {
+  if (selected) return settings.value.darkMode ? 'bg-stone-100 opacity-20' : 'bg-stone-950 opacity-15'
+  return settings.value.darkMode
+    ? 'bg-white opacity-0 group-hover:opacity-[0.08]'
+    : 'bg-stone-950 opacity-0 group-hover:opacity-[0.07]'
+}
 const availableLockedSeasons = computed(() => seasons.map((season, index) => ({ name: season.name, index })))
 
 const fontClass = computed(() => {
@@ -125,36 +131,40 @@ const chooseSeason = index => {
         </button>
       </nav>
 
-      <section class="relative isolate flex-1 min-w-0 min-h-0 text-stone-200">
-        <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl bg-stone-950 opacity-[0.96]" style="filter: url(#ink-blot); transform: rotate(0.08deg) scale(0.995);"></span>
+      <section class="relative isolate flex-1 min-w-0 min-h-0 transition-colors duration-700" :style="{ color: activeSeasonInk.color }">
+        <span
+          aria-hidden="true"
+          class="absolute inset-0 -z-10 rounded-3xl opacity-[0.96] transition-[background-color] duration-700"
+          :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(0.08deg) scale(0.995)' }"
+        ></span>
         <div class="h-full overflow-y-auto no-scrollbar px-5 py-7 sm:px-8 sm:py-8">
           <div v-if="activeSection === 'reading'" class="flex flex-col gap-8">
             <header>
-              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :class="'text-stone-100'">Reading</h2>
-              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :class="'text-stone-400'">How the passage feels beneath your hands</p>
+              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :style="{ color: activeSeasonInk.color }">Reading</h2>
+              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :style="{ color: activeSeasonInk.color }">How the passage feels beneath your hands</p>
             </header>
 
             <fieldset class="flex flex-col gap-3">
-              <legend class="text-xs uppercase tracking-widest mb-2" :class="'text-stone-300'">Typography style</legend>
+              <legend class="text-xs uppercase tracking-widest mb-2" :style="{ color: activeSeasonInk.color }">Typography style</legend>
               <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
                 <button v-for="font in fontOptions" :key="font.id" @click="settings.fontFamily = font.id" :aria-pressed="settings.fontFamily === font.id" class="relative isolate min-h-11 px-2 group">
-                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.fontFamily === font.id ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>
-                  <span class="text-[10px] uppercase tracking-wide" :class="settings.fontFamily === font.id ? 'text-stone-100' : 'text-stone-400'">{{ font.label }}</span>
+                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.fontFamily === font.id)" style="filter: url(#ink-blot);"></span>
+                  <span class="text-[10px] uppercase tracking-wide" :class="settings.fontFamily === font.id ? 'opacity-100' : 'opacity-60'">{{ font.label }}</span>
                 </button>
               </div>
               <div class="relative isolate mt-2 p-5 min-h-28 flex flex-col items-center justify-center">
                 <span class="text-[9px] uppercase tracking-widest opacity-50 mb-3">Live preview</span>
-                <span :class="[fontClass, previewReadabilityClass, 'text-stone-200']">“Empty your mind. Be formless, shapeless — like water.”</span>
+                <span :class="[fontClass, previewReadabilityClass]">“Empty your mind. Be formless, shapeless — like water.”</span>
               </div>
             </fieldset>
 
             <fieldset class="flex flex-col gap-4">
-              <legend class="text-xs uppercase tracking-widest mb-1" :class="'text-stone-300'">Reading comfort</legend>
+              <legend class="text-xs uppercase tracking-widest mb-1" :style="{ color: activeSeasonInk.color }">Reading comfort</legend>
               <div>
                 <span class="text-[10px] uppercase tracking-wider opacity-60">Text size</span>
                 <div class="grid grid-cols-3 gap-2 mt-2">
                   <button v-for="size in ['small', 'medium', 'large']" :key="size" @click="settings.textSize = size" :aria-pressed="settings.textSize === size" class="relative isolate min-h-11 uppercase text-[10px] tracking-wide group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.textSize === size ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ size }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.textSize === size)" style="filter: url(#ink-blot);"></span>{{ size }}
                   </button>
                 </div>
               </div>
@@ -162,7 +172,7 @@ const chooseSeason = index => {
                 <span class="text-[10px] uppercase tracking-wider opacity-60">Line spacing</span>
                 <div class="grid grid-cols-3 gap-2 mt-2">
                   <button v-for="spacing in ['compact', 'comfortable', 'spacious']" :key="spacing" @click="settings.lineSpacing = spacing" :aria-pressed="settings.lineSpacing === spacing" class="relative isolate min-h-11 uppercase text-[9px] sm:text-[10px] group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.lineSpacing === spacing ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ spacing }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.lineSpacing === spacing)" style="filter: url(#ink-blot);"></span>{{ spacing }}
                   </button>
                 </div>
               </div>
@@ -170,7 +180,7 @@ const chooseSeason = index => {
                 <span class="text-[10px] uppercase tracking-wider opacity-60">Alignment</span>
                 <div class="grid grid-cols-2 gap-2 mt-2">
                   <button v-for="alignment in ['left', 'center']" :key="alignment" @click="settings.textAlignment = alignment" :aria-pressed="settings.textAlignment === alignment" class="relative isolate min-h-11 uppercase text-[10px] group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.textAlignment === alignment ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ alignment }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.textAlignment === alignment)" style="filter: url(#ink-blot);"></span>{{ alignment }}
                   </button>
                 </div>
               </div>
@@ -182,7 +192,7 @@ const chooseSeason = index => {
                 <span class="block text-[9px] uppercase tracking-wide opacity-50 mt-1 mb-3">{{ toggle.note }}</span>
                 <div class="grid grid-cols-2 gap-2">
                   <button v-for="option in [false, true]" :key="String(option)" @click="settings[toggle.key] = option" :aria-pressed="settings[toggle.key] === option" class="relative isolate min-h-10 text-[10px] uppercase group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings[toggle.key] === option ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings[toggle.key] === option)" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
                   </button>
                 </div>
               </div>
@@ -191,15 +201,15 @@ const chooseSeason = index => {
 
           <div v-else-if="activeSection === 'visuals'" class="flex flex-col gap-8">
             <header>
-              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :class="'text-stone-100'">Visuals</h2>
-              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :class="'text-stone-400'">Light, movement, and the season around you</p>
+              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :style="{ color: activeSeasonInk.color }">Visuals</h2>
+              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :style="{ color: activeSeasonInk.color }">Light, movement, and the season around you</p>
             </header>
 
             <fieldset>
               <legend class="text-xs uppercase tracking-widest mb-3">Appearance</legend>
               <div class="grid grid-cols-3 gap-2">
                 <button v-for="mode in appearanceOptions" :key="mode" @click="chooseAppearance(mode)" :aria-pressed="settings.appearanceMode === mode" class="relative isolate min-h-11 uppercase text-[10px] group">
-                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.appearanceMode === mode ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ mode }}
+                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.appearanceMode === mode)" style="filter: url(#ink-blot);"></span>{{ mode }}
                 </button>
               </div>
             </fieldset>
@@ -208,7 +218,7 @@ const chooseSeason = index => {
               <legend class="text-xs uppercase tracking-widest mb-3">Motion</legend>
               <div class="grid grid-cols-3 gap-2">
                 <button v-for="mode in motionOptions" :key="mode" @click="settings.motionMode = mode" :aria-pressed="settings.motionMode === mode" class="relative isolate min-h-11 uppercase text-[10px] group">
-                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.motionMode === mode ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ mode }}
+                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.motionMode === mode)" style="filter: url(#ink-blot);"></span>{{ mode }}
                 </button>
               </div>
               <p class="text-[9px] uppercase tracking-wide opacity-50 mt-3">System follows your device. Reduced calms movement. Full keeps every effect.</p>
@@ -219,10 +229,10 @@ const chooseSeason = index => {
               <p class="text-[9px] uppercase tracking-wide opacity-50 mb-3">Automatic follows the current season</p>
               <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                 <button @click="chooseAutomaticAtmosphere" :aria-pressed="settings.themeMode === 'realtime'" class="relative isolate min-h-11 uppercase text-[10px] group">
-                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.themeMode === 'realtime' ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>Automatic
+                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.themeMode === 'realtime')" style="filter: url(#ink-blot);"></span>Automatic
                 </button>
                 <button v-for="season in availableLockedSeasons" :key="season.index" @click="chooseSeason(season.index)" :aria-pressed="settings.themeMode === 'locked' && settings.lockedSeason === season.index" class="relative isolate min-h-11 uppercase text-[10px] group">
-                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.themeMode === 'locked' && settings.lockedSeason === season.index ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ season.name }}
+                  <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.themeMode === 'locked' && settings.lockedSeason === season.index)" style="filter: url(#ink-blot);"></span>{{ season.name }}
                 </button>
               </div>
             </fieldset>
@@ -230,8 +240,8 @@ const chooseSeason = index => {
 
           <div v-else class="flex flex-col gap-8">
             <header>
-              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :class="'text-stone-100'">Sound</h2>
-              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :class="'text-stone-400'">Optional layers—silence is always available</p>
+              <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :style="{ color: activeSeasonInk.color }">Sound</h2>
+              <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :style="{ color: activeSeasonInk.color }">Optional layers—silence is always available</p>
             </header>
 
             <div class="px-1 py-2 sm:px-3 sm:py-3">
@@ -243,15 +253,15 @@ const chooseSeason = index => {
                 </div>
                 <div class="grid grid-cols-2 gap-1 w-28">
                   <button v-for="option in [false, true]" :key="String(option)" @click="settings.seasonalAmbience = option" :aria-pressed="settings.seasonalAmbience === option" class="relative isolate min-h-10 text-[10px] uppercase group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings.seasonalAmbience === option ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings.seasonalAmbience === option)" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
                   </button>
                 </div>
               </div>
               <label class="flex justify-between text-[9px] uppercase tracking-wide opacity-60 mt-5"><span>Volume</span><output>{{ Math.round(settings.ambientVolume * 100) }}%</output></label>
               <div class="relative mt-2 h-7 flex items-center" :class="!settings.seasonalAmbience ? 'opacity-25' : 'opacity-100'">
-                <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full bg-white/10" style="filter: url(#ink-blot);"></span>
-                <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full bg-stone-300/75" :style="{ width: `${settings.ambientVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
-                <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]" :style="{ left: `${settings.ambientVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-white/10' : 'bg-stone-950/10'" style="filter: url(#ink-blot);"></span>
+                <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-stone-300/75' : 'bg-stone-900/55'" :style="{ width: `${settings.ambientVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full" :class="settings.darkMode ? 'bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]' : 'bg-stone-900 shadow-[0_0_0_3px_rgba(250,250,249,0.45)]'" :style="{ left: `${settings.ambientVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
                 <input v-model.number.lazy="settings.ambientVolume" type="range" min="0" max="1" step="0.05" :disabled="!settings.seasonalAmbience" aria-label="Seasonal ambience volume" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" />
               </div>
             </div>
@@ -261,16 +271,16 @@ const chooseSeason = index => {
               <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1 mb-4">Six distinct stations composed inside Trace</p>
               <div class="grid sm:grid-cols-2 gap-2">
                 <button v-for="track in lofiOptions" :key="track.id" @click="settings.lofiTrack = track.id" :aria-pressed="settings.lofiTrack === track.id" class="relative isolate min-h-14 px-3 text-left group">
-                  <span class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="settings.lofiTrack === track.id ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>
+                  <span class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="selectedControlInk(settings.lofiTrack === track.id)" style="filter: url(#ink-blot);"></span>
                   <span class="block text-[10px] uppercase tracking-wider">{{ track.label }}</span>
                   <span class="block text-[8px] uppercase tracking-wide opacity-45 mt-1">{{ track.note }}</span>
                 </button>
               </div>
               <label class="flex justify-between text-[9px] uppercase tracking-wide opacity-60 mt-5"><span>Music volume</span><output>{{ Math.round(settings.lofiVolume * 100) }}%</output></label>
               <div class="relative mt-2 h-7 flex items-center" :class="settings.lofiTrack === 'off' ? 'opacity-25' : 'opacity-100'">
-                <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full bg-white/10" style="filter: url(#ink-blot);"></span>
-                <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full bg-stone-300/75" :style="{ width: `${settings.lofiVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
-                <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]" :style="{ left: `${settings.lofiVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-white/10' : 'bg-stone-950/10'" style="filter: url(#ink-blot);"></span>
+                <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-stone-300/75' : 'bg-stone-900/55'" :style="{ width: `${settings.lofiVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full" :class="settings.darkMode ? 'bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]' : 'bg-stone-900 shadow-[0_0_0_3px_rgba(250,250,249,0.45)]'" :style="{ left: `${settings.lofiVolume * 100}%`, filter: 'url(#ink-blot)' }"></span>
                 <input v-model.number.lazy="settings.lofiVolume" type="range" min="0" max="1" step="0.05" :disabled="settings.lofiTrack === 'off'" aria-label="Lo-fi music volume" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" />
               </div>
             </fieldset>
@@ -281,14 +291,14 @@ const chooseSeason = index => {
                 <p class="text-[9px] uppercase tracking-wide opacity-50 mt-1 mb-4">{{ sound.note }}</p>
                 <div class="grid grid-cols-2 gap-2">
                   <button v-for="option in [false, true]" :key="String(option)" @click="settings[sound.key] = option" :aria-pressed="settings[sound.key] === option" class="relative isolate min-h-10 text-[10px] uppercase group">
-                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="settings[sound.key] === option ? ('bg-stone-200 opacity-20') : 'bg-white opacity-0 group-hover:opacity-[0.08]'" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
+                    <span class="absolute inset-0 -z-10 rounded-lg transition-opacity" :class="selectedControlInk(settings[sound.key] === option)" style="filter: url(#ink-blot);"></span>{{ option ? 'On' : 'Off' }}
                   </button>
                 </div>
                 <label class="flex justify-between text-[9px] uppercase tracking-wide opacity-60 mt-4"><span>Volume</span><output>{{ Math.round(settings[sound.volume] * 100) }}%</output></label>
                 <div class="relative mt-2 h-7 flex items-center" :class="!settings[sound.key] ? 'opacity-25' : 'opacity-100'">
-                  <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full bg-white/10" style="filter: url(#ink-blot);"></span>
-                  <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full bg-stone-300/75" :style="{ width: `${settings[sound.volume] * 100}%`, filter: 'url(#ink-blot)' }"></span>
-                  <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]" :style="{ left: `${settings[sound.volume] * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                  <span aria-hidden="true" class="absolute inset-x-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-white/10' : 'bg-stone-950/10'" style="filter: url(#ink-blot);"></span>
+                  <span aria-hidden="true" class="absolute left-0 h-1.5 rounded-full" :class="settings.darkMode ? 'bg-stone-300/75' : 'bg-stone-900/55'" :style="{ width: `${settings[sound.volume] * 100}%`, filter: 'url(#ink-blot)' }"></span>
+                  <span aria-hidden="true" class="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full" :class="settings.darkMode ? 'bg-stone-100 shadow-[0_0_0_3px_rgba(28,25,23,0.45)]' : 'bg-stone-900 shadow-[0_0_0_3px_rgba(250,250,249,0.45)]'" :style="{ left: `${settings[sound.volume] * 100}%`, filter: 'url(#ink-blot)' }"></span>
                   <input v-model.number.lazy="settings[sound.volume]" type="range" min="0" max="1" step="0.05" :disabled="!settings[sound.key]" :aria-label="`${sound.title} volume`" class="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-not-allowed" />
                 </div>
               </div>
