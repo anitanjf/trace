@@ -73,8 +73,8 @@ const chooseSeason = index => {
 </script>
 
 <template>
-  <main class="z-10 flex flex-col w-full max-w-5xl h-[90vh] py-6 sm:py-8 px-4 sm:px-6 font-ui-sans" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-800'">
-    <header class="flex items-end justify-between gap-4 mb-5 sm:mb-7">
+  <main class="z-10 flex shrink-0 flex-col w-full max-w-5xl h-[100dvh] sm:h-[90dvh] py-8 sm:py-10 px-5 sm:px-8 font-ui-sans" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-800'">
+    <header class="flex items-end justify-between gap-5 mb-7 sm:mb-9">
       <div>
         <p class="text-[9px] uppercase tracking-[0.35em] opacity-55 mb-2" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Shape your quiet</p>
         <h1 class="text-3xl sm:text-4xl tracking-[0.28em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Preferences</h1>
@@ -85,7 +85,7 @@ const chooseSeason = index => {
       </button>
     </header>
 
-    <div class="flex flex-col sm:flex-row gap-5 sm:gap-7 min-h-0 flex-1">
+    <div class="flex flex-col sm:flex-row gap-6 sm:gap-10 min-h-0 flex-1">
       <nav aria-label="Preference groups" class="grid grid-cols-3 sm:flex sm:flex-col gap-2 sm:w-44 flex-shrink-0">
         <button v-for="section in sections" :key="section.id" @click="activeSection = section.id" :aria-pressed="activeSection === section.id" class="relative isolate min-h-14 sm:min-h-16 px-3 sm:px-5 text-left group">
           <span class="absolute inset-0 -z-10 rounded-xl transition-opacity" :class="activeSection === section.id ? (settings.darkMode ? 'bg-stone-600 opacity-45' : 'bg-stone-300 opacity-75') : (settings.darkMode ? 'bg-white opacity-[0.025] group-hover:opacity-[0.06]' : 'bg-stone-200 opacity-30 group-hover:opacity-55')" style="filter: url(#ink-blot);"></span>
@@ -94,9 +94,8 @@ const chooseSeason = index => {
         </button>
       </nav>
 
-      <section class="relative isolate flex-1 min-w-0 min-h-0">
-        <div class="absolute inset-0 -z-10 rounded-3xl opacity-40" :class="settings.darkMode ? 'bg-stone-900' : 'bg-[#F7F1E8]'" style="filter: url(#ink-blot); transform: rotate(0.08deg);"></div>
-        <div class="h-full overflow-y-auto no-scrollbar px-5 py-6 sm:px-8 sm:py-8 mask-fade-edges">
+      <section class="relative flex-1 min-w-0 min-h-0">
+        <div class="h-full overflow-y-auto no-scrollbar px-1 pb-12 sm:px-5 sm:py-1">
           <div v-if="activeSection === 'reading'" class="flex flex-col gap-8">
             <header>
               <h2 class="text-xl tracking-[0.22em] uppercase font-ui-serif" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-900'">Reading</h2>
@@ -259,6 +258,6 @@ const chooseSeason = index => {
       </section>
     </div>
 
-    <p class="text-center text-[9px] uppercase tracking-widest opacity-50 mt-4" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">{{ currentUser ? 'Preferences sync with your account.' : 'Saved on this device. Sign in to sync across devices.' }}</p>
+    <p class="text-center text-[9px] uppercase tracking-widest opacity-50 mt-6 sm:mt-7" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">{{ currentUser ? 'Preferences sync with your account.' : 'Saved on this device. Sign in to sync across devices.' }}</p>
   </main>
 </template>
