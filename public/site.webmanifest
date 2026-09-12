@@ -1,0 +1,19 @@
+{
+  "name": "Trace — Mindful Typing",
+  "short_name": "Trace",
+  "description": "A quiet typing ritual for seasonal reflection, gentle focus, and progress without pressure.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F5EFE6",
+  "theme_color": "#C9AA8D",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
