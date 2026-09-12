@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   calculatePassageProgress,
   createProgressMessage,
@@ -49,5 +50,11 @@ assert.deepEqual(active, [
   { id: 'first', progress: 32, complete: false, lastSeen: 99_000 },
   { id: 'second', progress: 100, complete: true, lastSeen: 98_000 }
 ])
+
+const databaseRulesSource = readFileSync(new URL('../database.rules.json', import.meta.url), 'utf8')
+const databaseRules = JSON.parse(databaseRulesSource)
+assert.equal(databaseRulesSource.includes('numChildren'), false)
+assert.ok(databaseRules.rules.quietRooms.$roomId.members.$slot)
+assert.ok(databaseRules.rules.quietRooms.$roomId.claims.$slot)
 
 console.log('Trace online quiet-room protocol checks passed.')

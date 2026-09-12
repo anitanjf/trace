@@ -57,6 +57,7 @@ export const useQuietRoom = () => {
   let memberRef = null
   let membersRef = null
   let claimRef = null
+  let claimSlot = null
 
   const partnerPresent = computed(() => Boolean(partner.value))
   const latencyTone = computed(() => {
@@ -84,28 +85,54 @@ export const useQuietRoom = () => {
   }
 
   const addMember = async () => {
-    if (!roomRef || !membersRef || !memberRef || !claimRef || !auth.currentUser) return { ok: false, reason: 'auth' }
-    roomDisconnect = onDisconnect(roomRef)
-    await roomDisconnect.update({
-      [`members/${clientId}`]: null,
-      [`claims/${clientId}`]: null
-    })
-    await set(claimRef, auth.currentUser.uid)
-    try {
-      await set(memberRef, memberPayload())
-      return { ok: true }
-    } catch (error) {
-      await remove(claimRef).catch(() => {})
-      const members = (await get(membersRef).catch(() => null))?.val() || {}
-      if (!members[clientId] && Object.keys(members).length >= 2) return { ok: false, reason: 'full' }
-      throw error
+    if (!roomRef || !membersRef || !auth.currentUser) return { ok: false, reason: 'auth' }
+
+    const slots = claimSlot ? [claimSlot] : ['one', 'two']
+    let lastError = null
+
+    for (const slot of slots) {
+      const nextClaimRef = databaseRef(rtdb, `quietRooms/${roomCode.value}/claims/${slot}`)
+      const nextMemberRef = databaseRef(rtdb, `quietRooms/${roomCode.value}/members/${slot}`)
+      let claimed = false
+      let nextDisconnect = null
+
+      try {
+        await set(nextClaimRef, { uid: auth.currentUser.uid, clientId })
+        claimed = true
+
+        nextDisconnect = onDisconnect(roomRef)
+        await nextDisconnect.update({
+          [`members/${slot}`]: null,
+          [`claims/${slot}`]: null
+        })
+        await set(nextMemberRef, memberPayload())
+
+        claimSlot = slot
+        claimRef = nextClaimRef
+        memberRef = nextMemberRef
+        roomDisconnect = nextDisconnect
+        return { ok: true }
+      } catch (error) {
+        lastError = error
+        await nextDisconnect?.cancel().catch(() => {})
+        if (claimed) {
+          await remove(nextMemberRef).catch(() => {})
+          await remove(nextClaimRef).catch(() => {})
+        }
+      }
     }
+
+    const members = (await get(membersRef).catch(() => null))?.val() || {}
+    if (Object.keys(members).some(key => key === 'one') && Object.keys(members).some(key => key === 'two')) {
+      return { ok: false, reason: 'full' }
+    }
+    throw lastError || new Error('The quiet room could not be joined.')
   }
 
   const observeRoom = () => {
     stopMembers = onValue(membersRef, snapshot => {
       const activeMembers = getActiveMembers(snapshot.val(), Date.now(), PEER_TIMEOUT_MS)
-      partner.value = activeMembers.find(member => member.id !== clientId) || null
+      partner.value = activeMembers.find(member => member.id !== claimSlot) || null
       connectionState.value = !isOnline.value
         ? 'reconnecting'
         : partner.value
@@ -157,6 +184,7 @@ export const useQuietRoom = () => {
     memberRef = null
     membersRef = null
     claimRef = null
+    claimSlot = null
     partner.value = null
     roomMeta.value = null
     roomError.value = ''
@@ -186,8 +214,9 @@ export const useQuietRoom = () => {
       roomMeta.value = { ...meta, joinedAt: Date.now() }
       roomRef = databaseRef(rtdb, `quietRooms/${code}`)
       membersRef = databaseRef(rtdb, `quietRooms/${code}/members`)
-      memberRef = databaseRef(rtdb, `quietRooms/${code}/members/${clientId}`)
-      claimRef = databaseRef(rtdb, `quietRooms/${code}/claims/${clientId}`)
+      claimSlot = null
+      memberRef = null
+      claimRef = null
       const result = await addMember()
       if (!result.ok) {
         await leaveRoom()
