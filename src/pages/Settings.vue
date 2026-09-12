@@ -204,9 +204,8 @@ const chooseSeason = index => {
               <p class="text-[10px] uppercase tracking-wider mt-2 opacity-60" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">Optional layers—silence is always available</p>
             </header>
 
-            <div class="relative isolate p-5">
-              <span class="absolute inset-0 -z-10 rounded-2xl opacity-20" :class="settings.darkMode ? 'bg-white' : 'bg-stone-300'" style="filter: url(#ink-blot); transform: rotate(-0.15deg);"></span>
-              <div class="flex items-start justify-between gap-4">
+            <div class="px-1 py-2 sm:px-3 sm:py-3">
+              <div class="flex items-start justify-between gap-5">
                 <div>
                   <h3 class="text-xs uppercase tracking-widest">Seasonal ambience</h3>
                   <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1">Now following {{ activeSeasonName }}</p>
@@ -222,9 +221,8 @@ const chooseSeason = index => {
               <input v-model.number.lazy="settings.ambientVolume" type="range" min="0" max="1" step="0.05" :disabled="!settings.seasonalAmbience" aria-label="Seasonal ambience volume" class="w-full mt-2 accent-[#b7791f] disabled:opacity-25" />
             </div>
 
-            <fieldset class="relative isolate p-5">
-              <legend class="text-xs uppercase tracking-widest px-1">Lo-fi background</legend>
-              <span class="absolute inset-0 -z-10 rounded-2xl opacity-20" :class="settings.darkMode ? 'bg-white' : 'bg-stone-300'" style="filter: url(#ink-blot); transform: rotate(0.12deg);"></span>
+            <fieldset class="px-1 py-2 sm:px-3 sm:py-3">
+              <legend class="text-xs uppercase tracking-widest">Lo-fi background</legend>
               <p class="text-[9px] uppercase tracking-wide opacity-55 mt-1 mb-4">Six distinct stations composed inside Trace</p>
               <div class="grid sm:grid-cols-2 gap-2">
                 <button v-for="track in lofiOptions" :key="track.id" @click="settings.lofiTrack = track.id" :aria-pressed="settings.lofiTrack === track.id" class="relative isolate min-h-14 px-3 text-left group">
@@ -238,8 +236,7 @@ const chooseSeason = index => {
             </fieldset>
 
             <div class="grid md:grid-cols-2 gap-4">
-              <div v-for="sound in [{ key: 'keystrokeSound', volume: 'keystrokeVolume', title: 'Keystrokes', note: 'Warm ink taps while typing' }, { key: 'interfaceSound', volume: 'interfaceVolume', title: 'Interface clicks', note: 'Soft response on buttons' }]" :key="sound.key" class="relative isolate p-5">
-                <span class="absolute inset-0 -z-10 rounded-2xl opacity-20" :class="settings.darkMode ? 'bg-white' : 'bg-stone-300'" style="filter: url(#ink-blot);"></span>
+              <div v-for="sound in [{ key: 'keystrokeSound', volume: 'keystrokeVolume', title: 'Keystrokes', note: 'Warm ink taps while typing' }, { key: 'interfaceSound', volume: 'interfaceVolume', title: 'Interface clicks', note: 'Soft response on buttons' }]" :key="sound.key" class="px-1 py-2 sm:px-3 sm:py-3">
                 <h3 class="text-xs uppercase tracking-widest">{{ sound.title }}</h3>
                 <p class="text-[9px] uppercase tracking-wide opacity-50 mt-1 mb-4">{{ sound.note }}</p>
                 <div class="grid grid-cols-2 gap-2">
