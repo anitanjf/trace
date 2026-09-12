@@ -182,12 +182,6 @@ const handleComplete = () => {
   publishProgress({ progress: 100, complete: true })
 }
 
-const fireflyStyle = player => ({
-  left: 'clamp(0.5rem, ' + Math.max(2, Math.min(98, Number(player.progress) || 0)) + '%, calc(100% - 0.5rem))',
-  top: (18 + players.value.findIndex(entry => entry.seat === player.seat) * 13) + '%',
-  color: fireflyColors[player.seat]
-})
-
 onMounted(async () => {
   const requested = normalizeRoomCode(route.query.room)
   if (requested.length === ROOM_CODE_LENGTH) await enterRoom(requested)
@@ -311,26 +305,18 @@ watch(currentUser, async user => {
         </div>
 
         <div v-else-if="isPlaying">
-          <section class="relative isolate mb-4 px-5 py-5 sm:px-8">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.11]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <div class="flex items-center justify-between gap-4 mb-3">
-              <p class="text-[8px] uppercase tracking-[0.22em] opacity-50">Firefly passage · {{ roomWordCount }} words</p>
-              <p class="text-[8px] uppercase tracking-[0.16em] opacity-40">The light nearest dawn arrives first</p>
-            </div>
-            <div class="firefly-field" aria-label="Live multiplayer positions">
-              <div class="absolute left-3 top-0 bottom-0 w-px opacity-20" :style="{ backgroundColor: 'var(--trace-text-primary)' }"></div>
-              <div class="absolute right-3 top-0 bottom-0 w-px opacity-25" :style="{ backgroundColor: 'var(--trace-season-ink)' }"></div>
-              <div v-for="player in players" :key="player.seat" class="race-firefly" :style="fireflyStyle(player)" :title="player.name + (player.seat === localSeat ? ' (you)' : '')">
-                <span class="race-firefly-glow"></span>
-                <span class="race-firefly-core"></span>
-                <span class="race-firefly-name">{{ player.name }}<small v-if="player.seat === localSeat"> · you</small></span>
-              </div>
-            </div>
-          </section>
-
           <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.1]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <TypingBoard :quote="passage" :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'" :passage-number="roomWordCount" game-mode="multiplayer" @progress="publishProgress" @passage-complete="handleComplete" />
+            <TypingBoard
+              :quote="passage"
+              :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'"
+              :passage-number="roomWordCount"
+              game-mode="multiplayer"
+              :multiplayer-players="players"
+              :local-seat="localSeat"
+              @progress="publishProgress"
+              @passage-complete="handleComplete"
+            />
           </section>
         </div>
 
@@ -366,59 +352,12 @@ watch(currentUser, async user => {
 </template>
 
 <style scoped>
-.firefly-field {
-  position: relative;
-  height: 8.5rem;
-  overflow: hidden;
-  border-radius: 1rem;
-  background:
-    radial-gradient(circle at 78% 45%, color-mix(in srgb, var(--trace-season-ink) 13%, transparent), transparent 28%),
-    linear-gradient(90deg, transparent, color-mix(in srgb, var(--trace-season-ink) 7%, transparent));
-}
-.race-firefly {
-  position: absolute;
-  width: 0;
-  height: 0;
-  transition: left 520ms cubic-bezier(.2,.8,.2,1);
-}
-.race-firefly-core {
-  position: absolute;
-  width: .48rem;
-  height: .48rem;
-  left: -.24rem;
-  top: -.24rem;
-  border-radius: 999px;
-  background: currentColor;
-  box-shadow: 0 0 .35rem .08rem currentColor;
-}
-.race-firefly-glow {
-  position: absolute;
-  width: 1.4rem;
-  height: 1.4rem;
-  left: -.7rem;
-  top: -.7rem;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: .16;
-  filter: blur(.18rem);
-  animation: multiplayer-pulse 2.8s ease-in-out infinite;
-}
-.race-firefly-name {
-  position: absolute;
-  left: .65rem;
-  top: -.55rem;
-  white-space: nowrap;
-  font-size: .48rem;
-  letter-spacing: .08em;
-  opacity: .65;
-}
-.race-firefly-name small { opacity: .65; }
 .firefly-idle { box-shadow: 0 0 .45rem currentColor; animation: multiplayer-pulse 2.8s ease-in-out infinite; }
 @keyframes multiplayer-pulse {
   0%, 100% { opacity: .35; transform: scale(.85); }
   50% { opacity: .95; transform: scale(1.15); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .race-firefly, .race-firefly-glow, .firefly-idle { transition: none; animation: none; }
+  .firefly-idle { transition: none; animation: none; }
 }
 </style>

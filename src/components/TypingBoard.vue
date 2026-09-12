@@ -9,7 +9,9 @@ const props = defineProps({
   seasonName: { type: String, required: true },
   passageNumber: { type: Number, required: true },
   gameMode: { type: String, required: true },
-  isPaused: { type: Boolean, default: false }
+  isPaused: { type: Boolean, default: false },
+  multiplayerPlayers: { type: Array, default: () => [] },
+  localSeat: { type: String, default: '' }
 })
 
 const emit = defineEmits(['passage-complete', 'progress', 'pause', 'resume'])
@@ -71,6 +73,7 @@ const mobileInputRef = ref(null)
 
 const cursorStyle = ref({ transform: 'translate(0px, 0px)', width: '0px', height: '0px', opacity: 0 })
 const fireflyStyle = ref({ transform: 'translate(0px, 0px)', opacity: 0 })
+const multiplayerFireflies = ref([])
 const cursorAbsoluteX = ref(-1000)
 const cursorAbsoluteY = ref(-1000)
 
@@ -121,6 +124,7 @@ const handleResize = () => {
   updateMobileViewport()
   calculateLines()
   updateCursor()
+  updateMultiplayerFireflies()
   ensureActiveLineVisible()
 }
 
@@ -164,6 +168,57 @@ const processedQuoteText = computed(() => {
   return text
 })
 const poemCharacters = computed(() => processedQuoteText.value.split(''))
+
+const playerFireflyColors = {
+  one: '#F2B8C6',
+  two: '#A8D5BA',
+  three: '#F3D28A',
+  four: '#9CC7E8',
+  five: '#C6AFE5'
+}
+
+const playerFireflyColor = seat => playerFireflyColors[seat] || '#FEF08A'
+
+const updateMultiplayerFireflies = async () => {
+  await nextTick()
+  if (
+    props.gameMode !== 'multiplayer' ||
+    !typingArea.value ||
+    !textContainer.value ||
+    isEntering.value ||
+    isTransitioning.value ||
+    isSweeping.value
+  ) {
+    multiplayerFireflies.value = []
+    return
+  }
+
+  const spans = textContainer.value.querySelectorAll('.char-span')
+  if (!spans.length) return
+  const areaRect = typingArea.value.getBoundingClientRect()
+  const racers = props.multiplayerPlayers.filter(player => player?.seat)
+  const laneOffsets = [-18, -9, 0, 9, 18]
+
+  multiplayerFireflies.value = racers.map((player, index) => {
+    const syncedProgress = Math.max(0, Math.min(100, Number(player.progress) || 0))
+    const progress = player.seat === props.localSeat
+      ? Math.min(100, (typedCount.value / Math.max(1, poemCharacters.value.length)) * 100)
+      : syncedProgress
+    const charIndex = Math.min(spans.length - 1, Math.floor((progress / 100) * (spans.length - 1)))
+    const target = spans[charIndex]
+    const rect = target.getBoundingClientRect()
+    const x = rect.left - areaRect.left + (progress >= 100 ? rect.width : rect.width / 2)
+    const y = rect.top - areaRect.top + rect.height / 2 + laneOffsets[index % laneOffsets.length]
+
+    return {
+      seat: player.seat,
+      name: player.name,
+      connected: player.connected !== false,
+      transform: `translate(${x}px, ${y}px)`,
+      color: playerFireflyColor(player.seat)
+    }
+  })
+}
 
 watch(typedCount, count => {
   const total = poemCharacters.value.length || 1
@@ -320,8 +375,13 @@ const updateCursor = async () => {
   }
 }
 
-watch(typedCount, updateCursor)
+watch(typedCount, () => {
+  updateCursor()
+  updateMultiplayerFireflies()
+})
 watch(() => props.quote, () => { nextTick(calculateLines) })
+watch(() => props.multiplayerPlayers, updateMultiplayerFireflies, { deep: true })
+watch(scrollOffset, () => requestAnimationFrame(updateMultiplayerFireflies))
 
 const processCharacter = (char) => {
   isTypingActive.value = true
@@ -533,6 +593,7 @@ onMounted(() => {
     schedule(() => {
        calculateLines(); 
        updateCursor();
+       updateMultiplayerFireflies();
     }, 50)
   }, enterDelay)
 })
@@ -594,7 +655,12 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div v-if="!shouldReduceMotion()" class="absolute top-0 left-0 z-40 pointer-events-none firefly-glide flex items-center justify-center" :style="fireflyStyle">
+      <div
+        v-if="props.gameMode !== 'multiplayer' && !shouldReduceMotion()"
+        class="absolute top-0 left-0 z-40 pointer-events-none firefly-glide flex items-center justify-center"
+        :style="fireflyStyle"
+        aria-hidden="true"
+      >
         <div class="w-full h-full absolute inset-0 flex items-center justify-center transition-opacity duration-1000" :class="isTransitioning || isSweeping || isEntering ? 'opacity-0' : 'opacity-100'">
             <div class="fireflies-container" :class="{ 'is-idle': !isTypingActive }">
                 <div class="firefly ff-1"></div>
@@ -602,6 +668,21 @@ onBeforeUnmount(() => {
                 <div class="firefly ff-3"></div>
             </div>
         </div>
+      </div>
+
+      <div
+        v-for="player in multiplayerFireflies"
+        :key="player.seat"
+        class="absolute top-0 left-0 z-40 pointer-events-none multiplayer-firefly-glide"
+        :style="{
+          transform: player.transform,
+          opacity: player.connected ? 1 : 0.35,
+          '--multiplayer-firefly-color': player.color
+        }"
+        aria-hidden="true"
+      >
+        <span class="multiplayer-firefly-label">{{ player.seat === props.localSeat ? 'You' : player.name }}</span>
+        <span class="player-race-firefly"></span>
       </div>
 
       <input
@@ -688,11 +769,16 @@ onBeforeUnmount(() => {
 .mobile-capture-input:focus-visible { outline: none; }
 .cursor-glide { transition: transform 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out; }
 .firefly-glide { transition: transform 1.5s cubic-bezier(0.2, 1, 0.4, 1), opacity 0.5s ease; will-change: transform; }
-.fireflies-container { position: absolute; width: 0; height: 0; }
+.multiplayer-firefly-glide { transition: transform .55s cubic-bezier(.2,.8,.2,1), opacity .4s ease; will-change: transform; }
+.multiplayer-firefly-label { position: absolute; left: .7rem; top: -.45rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .72; }
+.player-race-firefly { position: absolute; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; color: var(--multiplayer-firefly-color); background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: multiplayer-race-glow 2.2s ease-in-out infinite; }
+.player-race-firefly::before { content: ''; position: absolute; inset: -7px; border-radius: 50%; background: currentColor; opacity: .12; filter: blur(3px); }
+.fireflies-container { position: absolute; width: 0; height: 0; color: var(--multiplayer-firefly-color, #fef08a); }
 .firefly { position: absolute; width: 4px; height: 4px; margin-top: -2px; margin-left: -2px; border-radius: 50%; pointer-events: none; }
-.firefly::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; background: #fef08a; box-shadow: 0 0 10px 3px rgba(253, 224, 71, 0.7); animation: flash 3s ease infinite alternate; }
+.firefly::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: flash 3s ease infinite alternate; }
 
-@keyframes flash { 0%, 20%, 100% { opacity: 0.3; box-shadow: 0 0 3px 1px rgba(253, 224, 71, 0.2); } 50% { opacity: 1; box-shadow: 0 0 12px 5px rgba(253, 224, 71, 0.8); } }
+@keyframes flash { 0%, 20%, 100% { opacity: 0.3; box-shadow: 0 0 3px 1px currentColor; } 50% { opacity: 1; box-shadow: 0 0 12px 5px currentColor; } }
+@keyframes multiplayer-race-glow { 0%, 100% { opacity: .45; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.2); } }
 .fireflies-container:not(.is-idle) .ff-1 { animation: roam1 9s infinite; }
 .fireflies-container:not(.is-idle) .ff-2 { animation: roam2 12s infinite reverse; }
 .fireflies-container:not(.is-idle) .ff-3 { animation: roam3 15s infinite; }
@@ -713,4 +799,8 @@ onBeforeUnmount(() => {
 .animate-blink { animation: blink-cursor 1.2s ease-in-out infinite; }
 @keyframes ink-puff { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
 .animate-ink-puff { animation: ink-puff 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .multiplayer-firefly-glide, .firefly-glide { transition: none; }
+  .firefly::before, .fireflies-container .firefly, .player-race-firefly { animation: none !important; }
+}
 </style>
