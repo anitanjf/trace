@@ -44,7 +44,6 @@ const consumeArchiveReplay = () => {
     if (!replay?.text) return null
     return { text: replay.text, author: replay.author || 'Unknown', archiveId: replay.id }
   } catch {
-    sessionStorage.removeItem('trace:archive-replay')
     return null
   }
 }
