@@ -74,6 +74,9 @@ const mobileInputRef = ref(null)
 const cursorStyle = ref({ transform: 'translate(0px, 0px)', width: '0px', height: '0px', opacity: 0 })
 const fireflyStyle = ref({ transform: 'translate(0px, 0px)', opacity: 0 })
 const multiplayerFireflies = ref([])
+const multiplayerMovingSeats = ref(new Set())
+const multiplayerProgressBySeat = new Map()
+const multiplayerMotionTimers = new Map()
 const cursorAbsoluteX = ref(-1000)
 const cursorAbsoluteY = ref(-1000)
 
@@ -179,6 +182,21 @@ const playerFireflyColors = {
 
 const playerFireflyColor = seat => playerFireflyColors[seat] || '#FEF08A'
 
+const markMultiplayerFireflyMoving = seat => {
+  const movingSeats = new Set(multiplayerMovingSeats.value)
+  movingSeats.add(seat)
+  multiplayerMovingSeats.value = movingSeats
+
+  cancelScheduledTimer(multiplayerMotionTimers.get(seat))
+  const timer = schedule(() => {
+    multiplayerMotionTimers.delete(seat)
+    const settledSeats = new Set(multiplayerMovingSeats.value)
+    settledSeats.delete(seat)
+    multiplayerMovingSeats.value = settledSeats
+  }, 900)
+  multiplayerMotionTimers.set(seat, timer)
+}
+
 const updateMultiplayerFireflies = async () => {
   await nextTick()
   if (
@@ -204,6 +222,11 @@ const updateMultiplayerFireflies = async () => {
     const progress = player.seat === props.localSeat
       ? Math.min(100, (typedCount.value / Math.max(1, poemCharacters.value.length)) * 100)
       : syncedProgress
+    const previousProgress = multiplayerProgressBySeat.get(player.seat)
+    if (previousProgress !== undefined && Math.abs(progress - previousProgress) > 0.01) {
+      markMultiplayerFireflyMoving(player.seat)
+    }
+    multiplayerProgressBySeat.set(player.seat, progress)
     const charIndex = Math.min(spans.length - 1, Math.floor((progress / 100) * (spans.length - 1)))
     const target = spans[charIndex]
     const rect = target.getBoundingClientRect()
@@ -674,6 +697,7 @@ onBeforeUnmount(() => {
         v-for="player in multiplayerFireflies"
         :key="player.seat"
         class="absolute top-0 left-0 z-40 pointer-events-none multiplayer-firefly-glide"
+        :class="{ 'is-moving': multiplayerMovingSeats.has(player.seat) }"
         :style="{
           transform: player.transform,
           opacity: player.connected ? 1 : 0.35,
@@ -779,20 +803,30 @@ onBeforeUnmount(() => {
 .multiplayer-racer-cluster .firefly::after {
   content: "";
   position: absolute;
-  right: 1px;
-  top: 50%;
-  width: 1.65rem;
-  height: .22rem;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, currentColor);
-  opacity: .34;
-  filter: blur(2px);
-  transform: translateY(-50%);
+  right: 0;
+  top: 48%;
+  width: .9rem;
+  height: .62rem;
+  border-bottom: .14rem solid currentColor;
+  border-radius: 0 0 75% 35%;
+  opacity: .24;
+  filter: blur(1.5px);
+  -webkit-mask-image: linear-gradient(90deg, transparent 4%, rgba(0, 0, 0, .3) 42%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 4%, rgba(0, 0, 0, .3) 42%, #000 100%);
+  transform-origin: right center;
   pointer-events: none;
-  animation: firefly-trail-breathe 2.4s ease-in-out infinite;
+  animation: firefly-trail-wave 1.8s ease-in-out infinite;
+  transition: width .5s cubic-bezier(.2,.8,.2,1), height .5s ease, opacity .4s ease, filter .4s ease;
 }
-.multiplayer-racer-cluster .ff-2::after { animation-delay: -.8s; }
-.multiplayer-racer-cluster .ff-3::after { animation-delay: -1.6s; }
+.multiplayer-racer-cluster .ff-2::after { animation-delay: -.6s; }
+.multiplayer-racer-cluster .ff-3::after { animation-delay: -1.2s; }
+.multiplayer-firefly-glide.is-moving .multiplayer-racer-cluster .firefly::after {
+  width: 2.8rem;
+  height: 1.05rem;
+  opacity: .52;
+  filter: blur(2px);
+  animation-duration: .82s;
+}
 .fireflies-container { position: absolute; width: 0; height: 0; color: var(--multiplayer-firefly-color, #fef08a); }
 .firefly { position: absolute; width: 4px; height: 4px; margin-top: -2px; margin-left: -2px; border-radius: 50%; pointer-events: none; }
 .firefly::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: flash 3s ease infinite alternate; }
@@ -813,7 +847,11 @@ onBeforeUnmount(() => {
 @keyframes orbit1 { 0% { transform: rotate(0deg) translateX(14px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(14px) rotate(-360deg); } }
 @keyframes orbit2 { 0% { transform: rotate(45deg) translateX(20px) rotate(-45deg); } 100% { transform: rotate(405deg) translateX(20px) rotate(-405deg); } }
 @keyframes orbit3 { 0% { transform: rotate(90deg) translateX(26px) rotate(-90deg); } 100% { transform: rotate(450deg) translateX(26px) rotate(-450deg); } }
-@keyframes firefly-trail-breathe { 0%, 100% { opacity: .16; transform: translateY(-50%) scaleX(.65); } 50% { opacity: .46; transform: translateY(-50%) scaleX(1); } }
+@keyframes firefly-trail-wave {
+  0%, 100% { transform: translateY(-48%) rotate(-12deg) scaleX(.82) scaleY(.78); }
+  35% { transform: translateY(-68%) rotate(8deg) scaleX(1) scaleY(1.08); }
+  70% { transform: translateY(-30%) rotate(-3deg) scaleX(.9) scaleY(.9); }
+}
 
 @keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
 .animate-blink { animation: blink-cursor 1.2s ease-in-out infinite; }
