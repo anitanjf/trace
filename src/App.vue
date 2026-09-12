@@ -101,9 +101,9 @@ const { themeStyle } = useTraceTheme()
 }
 
 :where(button, a, input, textarea, select, [tabindex]):focus-visible {
-  outline: 3px solid #b7791f;
+  outline: 3px solid var(--trace-focus);
   outline-offset: 4px;
-  border-radius: 0.375rem;
+  border-radius: var(--trace-radius-control);
 }
 
 .reduce-motion :where(button, a, input, textarea, select, [tabindex]):focus-visible {
