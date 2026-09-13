@@ -1,6 +1,9 @@
 <script setup>
+import { computed, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import Atmosphere from './components/Atmosphere.vue'
 import ZenLoader from './components/ZenLoader.vue'
+import IntroSplash from './components/IntroSplash.vue'
 import SyncStatus from './components/SyncStatus.vue'
 import { isAppReady, settings, shouldReduceMotion } from './store'
 import { useAppAudio } from './composables/useAudio'
@@ -8,6 +11,18 @@ import { useTraceTheme } from './composables/useTraceTheme'
 
 useAppAudio()
 const { themeStyle } = useTraceTheme()
+const route = useRoute()
+const introSeen = ref(false)
+try { introSeen.value = sessionStorage.getItem('trace-intro-seen') === '1' } catch { /* storage may be unavailable */ }
+const introFinished = ref(false)
+const shouldShowIntro = computed(() => route.path === '/' && !introSeen.value)
+const showApp = computed(() => isAppReady.value && (!shouldShowIntro.value || introFinished.value))
+
+watch(showApp, ready => {
+  if (!ready || !shouldShowIntro.value || !introFinished.value) return
+  try { sessionStorage.setItem('trace-intro-seen', '1') } catch { /* storage may be unavailable */ }
+  introSeen.value = true
+})
 </script>
 
 <template>
@@ -18,9 +33,11 @@ const { themeStyle } = useTraceTheme()
 
     <transition name="splash-fade">
       <!-- 2. The Main App (Revealed when Firebase finishes loading) -->
-      <div v-if="isAppReady" class="w-full min-h-[100dvh] flex flex-col items-center justify-start absolute inset-0 z-10 overflow-x-hidden overflow-y-auto overscroll-y-contain">
+      <div v-if="showApp" class="w-full min-h-[100dvh] flex flex-col items-center justify-start absolute inset-0 z-10 overflow-x-hidden overflow-y-auto overscroll-y-contain">
         <router-view :key="$route.fullPath"></router-view>
       </div>
+
+      <IntroSplash v-else-if="shouldShowIntro" :reduced-motion="shouldReduceMotion()" @finish="introFinished = true" />
 
       <!-- 3. Solid, Poetic Splash Screen Overlay (Shows while waiting) -->
       <div v-else class="absolute inset-0 z-50 flex flex-col items-center justify-center w-full h-full transition-colors duration-1000"
@@ -36,7 +53,7 @@ const { themeStyle } = useTraceTheme()
           <div class="w-16 h-px mb-12 opacity-30 transition-colors duration-1000" 
                :class="settings.darkMode ? 'bg-stone-400' : 'bg-stone-600'"></div>
           
-          <ZenLoader text="Gathering presence..." />
+          <ZenLoader :show-thought="false" text="Gathering presence..." />
           
         </div>
       </div>
