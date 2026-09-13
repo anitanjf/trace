@@ -1,9 +1,11 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { stats, settings } from '../store'
+import { settings } from '../store'
 import ComingSoonModal from '../components/ComingSoonModal.vue'
 import InkButton from '../components/ui/InkButton.vue'
+import InkInfoButton from '../components/ui/InkInfoButton.vue'
+import ZenLoader from '../components/ZenLoader.vue'
 
 const router = useRouter()
 const activeModeInfo = ref(null)
@@ -32,21 +34,17 @@ const handleModeAction = async () => {
   if (routeName) await router.push({ name: routeName })
 }
 
-const lifetimeAccuracy = computed(() => {
-  if (stats.value.lifetimeKeystrokes === 0) return null
-  const correct = stats.value.lifetimeKeystrokes - stats.value.lifetimeMistakes
-  return Math.max(0, Math.round((correct / stats.value.lifetimeKeystrokes) * 100))
-})
 </script>
 
 <template>
-  <main class="z-10 flex shrink-0 flex-col items-center w-full max-w-2xl mx-auto my-0 sm:my-auto gap-8 pt-10 pb-28 sm:pt-12 sm:pb-16 px-4 sm:px-6 transition-all duration-700" :class="[
+  <main class="z-10 flex shrink-0 flex-col items-center w-full max-w-2xl mx-auto my-0 sm:my-auto gap-6 pt-10 pb-20 sm:pt-12 sm:pb-16 px-4 sm:px-6 transition-all duration-700" :class="[
       { 'blur-sm opacity-40 scale-95 pointer-events-none': activeModeInfo },
       settings?.darkMode ? 'text-stone-300' : 'text-stone-800'
     ]">
     <header class="text-center">
       <h1 class="text-5xl sm:text-7xl tracking-[0.35em] uppercase leading-none font-bold" :class="settings?.darkMode ? 'text-stone-100' : 'text-stone-900'">TRACE</h1>
-      <p class="mt-3 text-xs uppercase tracking-[0.45em] opacity-70 font-ui-sans">Leave your mark gently</p>
+      <p class="mt-3 text-[10px] sm:text-xs uppercase tracking-[0.3em] opacity-70 font-ui-sans">A little stillness in every word</p>
+      <div class="mt-2 flex justify-center" aria-hidden="true"><ZenLoader compact text="" /></div>
     </header>
 
     <section class="w-full space-y-4" aria-labelledby="practice-heading">
@@ -61,45 +59,44 @@ const lifetimeAccuracy = computed(() => {
           <span class="flex flex-col gap-2">
             <span class="text-[9px] uppercase tracking-[0.3em] font-ui-sans font-semibold" :style="{ color: 'var(--trace-season-accent)' }">Start here</span>
             <span class="text-xl sm:text-2xl tracking-[0.16em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-100' : 'text-stone-900'">Begin Meditation</span>
-            <span id="meditation-description" class="text-xs sm:text-sm leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-700'">Practice a seasonal passage at your own pace and build lasting progress.</span>
+            <span id="meditation-description" class="text-xs sm:text-sm leading-relaxed font-ui-sans normal-case tracking-normal" :class="settings?.darkMode ? 'text-stone-300' : 'text-stone-700'">Settle into a seasonal passage. Let each word find its place.</span>
           </span>
           <span aria-hidden="true" class="text-xl group-hover:translate-x-1 transition-transform" :style="{ color: 'var(--trace-season-accent)' }">→</span>
         </div>
       </button>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="relative isolate min-h-20 p-4 group">
+        <div class="relative isolate min-h-24 p-4 sm:p-5 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.36] group-hover:opacity-[0.46]' : 'opacity-[0.28] group-hover:opacity-[0.38]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.2deg)' }"></div>
-          <button @click="router.push('/daily')" class="relative z-10 min-h-12 w-full pr-12 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</button>
-          <button @click="openModeInfo('daily')" type="button" aria-label="About Daily Reflection" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
-            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px] opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">i</span>
+          <button @click="router.push('/daily')" class="relative z-10 min-h-16 w-full pr-9 text-left flex flex-col justify-center gap-1">
+            <span class="text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</span>
+            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Return to a moment of stillness.</span>
           </button>
+          <InkInfoButton label="About Daily Reflection" @click="openModeInfo('daily')" />
         </div>
 
-        <div class="relative isolate min-h-20 p-4 group">
+        <div class="relative isolate min-h-24 p-4 sm:p-5 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.36] group-hover:opacity-[0.46]' : 'opacity-[0.28] group-hover:opacity-[0.38]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(-0.2deg)' }"></div>
-          <button @click="router.push('/flow')" class="relative z-10 min-h-12 w-full pr-12 text-left text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</button>
-          <button @click="openModeInfo('flow')" type="button" aria-label="About Flow State" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
-            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px] opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">i</span>
+          <button @click="router.push('/flow')" class="relative z-10 min-h-16 w-full pr-9 text-left flex flex-col justify-center gap-1">
+            <span class="text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</span>
+            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Let the words carry you.</span>
           </button>
+          <InkInfoButton label="About Flow State" @click="openModeInfo('flow')" />
         </div>
 
-        <div class="relative isolate min-h-16 p-4 sm:col-span-2 group">
+        <div class="relative isolate min-h-20 p-4 sm:p-5 sm:col-span-2 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.26] group-hover:opacity-[0.36]' : 'opacity-[0.20] group-hover:opacity-[0.30]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.1deg) scaleX(1.002)' }"></div>
-          <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-11 w-full pr-12 flex items-center gap-2 text-left">
-            <span class="text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-            <span class="px-2 py-0.5 rounded-full border text-[8px] uppercase tracking-normal font-ui-sans opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">Online</span>
+          <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-14 w-full pr-10 flex flex-col justify-center gap-1 text-left">
+            <span class="text-xs sm:text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
+            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Follow your light beside others.</span>
           </button>
-          <button @click="openModeInfo('multiplayer')" type="button" aria-label="About Multiplayer" class="absolute z-20 top-1 right-1 w-11 h-11 flex items-center justify-center">
-            <span aria-hidden="true" class="w-6 h-6 rounded-full border flex items-center justify-center font-ui-serif text-[10px] opacity-75" :style="{ borderColor: 'var(--trace-season-accent)', color: 'var(--trace-season-accent)' }">i</span>
-          </button>
+          <InkInfoButton label="About Multiplayer" @click="openModeInfo('multiplayer')" />
         </div>
       </div>
     </section>
 
-    <section class="w-full pt-6 border-t" :class="settings?.darkMode ? 'border-stone-800' : 'border-stone-300'" aria-labelledby="explore-heading">
-      <h2 id="explore-heading" class="text-[9px] uppercase tracking-[0.3em] opacity-55 text-center mb-4 font-ui-sans">Explore Trace</h2>
-      <nav aria-label="Account and information" class="grid grid-cols-2 sm:grid-cols-5 gap-2 font-ui-sans">
+    <section class="w-full pt-5 border-t" :class="settings?.darkMode ? 'border-stone-800' : 'border-stone-300'">
+      <nav aria-label="Profile, leaderboards, and information" class="grid grid-cols-2 sm:grid-cols-5 gap-2 font-ui-sans">
         <InkButton variant="ghost" block compact @click="router.push('/profile')" class="text-[10px] uppercase tracking-[0.16em]">Profile</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/archive')" class="text-[10px] uppercase tracking-[0.16em]">Archive</InkButton>
         <InkButton variant="soft" block compact @click="router.push('/leaderboards')" class="col-span-2 sm:col-span-1 text-[10px] uppercase tracking-[0.16em]">Leaderboards</InkButton>
@@ -108,14 +105,6 @@ const lifetimeAccuracy = computed(() => {
       </nav>
     </section>
 
-    <footer class="flex flex-col items-center gap-3">
-      <div class="flex gap-12 sm:gap-16 text-[11px] uppercase tracking-[0.25em] font-ui-sans" :class="settings?.darkMode ? 'text-stone-400' : 'text-stone-700'">
-        <span class="flex flex-col items-center gap-1"><span class="opacity-45">Passages</span><span>{{ stats.lifetimePassages }}</span></span>
-        <span class="flex flex-col items-center gap-1"><span class="opacity-45">Clarity · Accuracy</span><span>{{ lifetimeAccuracy === null ? 'No data' : `${lifetimeAccuracy}%` }}</span></span>
-      </div>
-      <p v-if="lifetimeAccuracy === null" class="text-[10px] opacity-60">Complete a passage to see your accuracy.</p>
-      <p class="sm:hidden text-[10px] text-center uppercase tracking-widest leading-relaxed opacity-50 font-ui-sans">Tap a passage to open your keyboard.<br>Rotate your device if you need more room.</p>
-    </footer>
   </main>
   <ComingSoonModal
     v-if="activeModeInfo"
