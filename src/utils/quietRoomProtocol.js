@@ -93,6 +93,23 @@ export const canJoinRoom = (room, uid, now = Date.now()) => {
   return room.meta.status === 'lobby' && Boolean(findOpenSeat(room.players, now))
 }
 
+// Public rooms are joined through matchmaking, not by passing around a code.
+// Existing travelers may still reconnect to their own room.
+export const canEnterByInvitation = (room, uid) =>
+  room?.meta?.type !== 'public' || Boolean(findPlayerSeat(room?.players, uid))
+
+// A finished room stays readable until its normal expiry. Leaving the result
+// screen only clears the traveler's own active-room pointer.
+export const shouldRemoveRoomOnLeave = (status, isHost) => status === 'lobby' && Boolean(isHost)
+
+export const calculateMatchStats = ({ typedCount = 0, keystrokes = 0, mistakes = 0, elapsedMs = 0 } = {}) => ({
+  wpm: Math.max(0, Math.round((typedCount / 5) / Math.max(elapsedMs / 60_000, .01))),
+  accuracy: keystrokes > 0 ? Math.max(0, Math.min(100, Math.round(((keystrokes - mistakes) / keystrokes) * 100))) : 100,
+  elapsedMs: Math.max(0, Math.round(elapsedMs)),
+  mistakes: Math.max(0, mistakes),
+  keystrokes: Math.max(0, keystrokes)
+})
+
 export const shouldStartPublicRoom = (room, now = Date.now()) =>
   room?.meta?.type === 'public' &&
   room.meta.status === 'lobby' &&
