@@ -1,8 +1,12 @@
 <script setup>
 import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { seasons } from '../utils/constants'
 import { settings, timeOfDay } from '../store'
 import { getRealWorldSeason } from '../utils/helpers'
+
+const route = useRoute()
+const isTypingRoute = computed(() => ['/meditation', '/daily', '/flow', '/multiplayer', '/play'].includes(route.path))
 
 const activeVisualIndex = computed(() => {
   if (settings.value.themeMode === 'locked') return settings.value.lockedSeason || 0
@@ -65,7 +69,7 @@ const getParticleStyle = (p, seasonName, isForeground) => {
     </svg>
 
     <!-- SEASONAL ATMOSPHERE DYNAMIC LAYER -->
-    <div class="absolute inset-0 z-[1] overflow-hidden">
+    <div class="absolute inset-0 z-[1] overflow-hidden transition-opacity duration-700" :class="isTypingRoute ? 'opacity-[0.42]' : 'opacity-100'">
       <div v-for="(season, sIdx) in seasons" :key="'season-'+sIdx" class="absolute inset-0 transition-opacity duration-[3000ms]" :class="activeVisualIndex === sIdx ? 'opacity-100' : 'opacity-0'">
         
         <!-- WET SEASON: Falling Rain Particles -->

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
-const [styles, app, home, settings, inkButton, settingsChoice, typingBoard, completionStats] = await Promise.all([
+const [styles, app, home, settings, inkButton, settingsChoice, typingBoard, completionStats, atmosphere] = await Promise.all([
   readFile(new URL('../src/style.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/App.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/Home.vue', import.meta.url), 'utf8'),
@@ -9,7 +9,8 @@ const [styles, app, home, settings, inkButton, settingsChoice, typingBoard, comp
   readFile(new URL('../src/components/ui/InkButton.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ui/SettingsChoice.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/TypingBoard.vue', import.meta.url), 'utf8'),
-  readFile(new URL('../src/components/CompletionStats.vue', import.meta.url), 'utf8')
+  readFile(new URL('../src/components/CompletionStats.vue', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/Atmosphere.vue', import.meta.url), 'utf8')
 ])
 
 const requiredTokens = [
@@ -57,5 +58,9 @@ assert.match(typingBoard, /solo-flight-light/)
 assert.match(typingBoard, /overflow-y-auto no-scrollbar/)
 assert.match(completionStats, /ui\/InkButton/)
 assert.doesNotMatch(completionStats, /Preserved in Archive|#DFBE73/i)
+assert.match(atmosphere, /isTypingRoute \? 'opacity-\[0\.42\]' : 'opacity-100'/)
+for (const practiceRoute of ['/meditation', '/daily', '/flow', '/multiplayer']) {
+  assert.ok(atmosphere.includes(practiceRoute), `Missing quieter atmosphere on ${practiceRoute}`)
+}
 
 console.log('Trace visual token and control checks passed.')
