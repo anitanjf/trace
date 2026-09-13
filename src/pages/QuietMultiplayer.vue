@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fallbackQuotes, seasons } from '../utils/constants'
-import { currentUser, settings } from '../store'
+import { currentUser, settings, recordMultiplayerMatch } from '../store'
 import {
   buildSharedPassage,
   MAX_PLAYERS,
@@ -89,6 +89,23 @@ const fireflyColors = {
 }
 
 const winner = computed(() => finishers.value.find(player => !forfeits.value[player.seat]) || null)
+watch([hasEnded, localPlayer], ([ended, player]) => {
+  if (!ended || !player || !roomCode.value || !currentUser.value) return
+  const ranked = finishers.value
+  recordMultiplayerMatch({
+    roomCode: roomCode.value,
+    wordCount: roomWordCount.value,
+    playedAt: Number(room.value?.meta?.endedAt) || Date.now(),
+    placement: ranked.findIndex(entry => entry.seat === localSeat.value) + 1,
+    players: ranked.length,
+    finished: player.complete && !forfeits.value[player.seat],
+    won: winner.value?.seat === player.seat && !forfeits.value[player.seat],
+    dnf: Boolean(forfeits.value[player.seat]),
+    wpm: player.wpm,
+    accuracy: player.accuracy,
+    elapsedMs: player.elapsedMs
+  })
+}, { immediate: true })
 const playerInitials = name => String(name || 'Traveler').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()
 const matchTime = elapsedMs => {
   if (!Number.isFinite(Number(elapsedMs)) || Number(elapsedMs) <= 0) return '—'
