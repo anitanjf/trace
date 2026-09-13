@@ -42,6 +42,7 @@ const {
   canStart,
   roomError,
   isBusy,
+  serverOffset,
   createRoom: createOnlineRoom,
   joinRoom,
   joinPublicRoom,
@@ -83,13 +84,13 @@ watch(hasEnded, ended => {
   if (ended && room.value?.meta?.endedReason === 'traveler-left') showEndedModal.value = true
 })
 
-watch(() => room.value?.meta?.startsAt, startsAt => {
+watch([() => room.value?.meta?.startsAt, serverOffset], ([startsAt]) => {
   clearInterval(countdownTimer)
   if (!startsAt) {
     countdown.value = 0
     return
   }
-  const update = () => { countdown.value = Math.max(0, Math.ceil((Number(startsAt) - Date.now()) / 1000)) }
+  const update = () => { countdown.value = Math.max(0, Math.ceil((Number(startsAt) - Date.now() - serverOffset.value) / 1000)) }
   update()
   countdownTimer = setInterval(update, 250)
 })
@@ -210,11 +211,11 @@ watch(currentUser, async user => {
     <div class="mx-auto w-full max-w-6xl">
       <header class="flex items-start justify-between gap-5 mb-8 sm:mb-10">
         <div>
-          <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">Many lights · one passage</p>
+          <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">One page · many paths</p>
           <h1 class="text-3xl sm:text-4xl tracking-[0.2em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Shared Current</h1>
-          <p class="mt-3 text-[9px] uppercase tracking-[0.16em] opacity-55">A gentle typing match · two to five travelers</p>
+          <p class="mt-3 text-[10px] tracking-[0.08em] opacity-65">Follow your light. Find your rhythm beside others.</p>
         </div>
-        <InkButton variant="ghost" compact class="uppercase tracking-[0.16em] text-[10px]" @click="returnHome">Return</InkButton>
+        <InkButton v-if="!roomCode" variant="soft" compact class="uppercase tracking-[0.16em] text-[10px]" @click="returnHome">Return home</InkButton>
       </header>
 
       <section v-if="!roomCode" class="mx-auto max-w-3xl">
@@ -248,7 +249,7 @@ watch(currentUser, async user => {
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.12]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
             <p class="text-[9px] uppercase tracking-[0.22em] opacity-55 mb-3">Public room</p>
             <h2 class="font-ui-serif text-xl mb-2">Join the gathering light</h2>
-            <p class="text-xs leading-relaxed opacity-65 mb-6">Match only with travelers who chose {{ selectedWordCount }} words. The oldest compatible lobby is filled first.</p>
+            <p class="text-xs leading-relaxed opacity-65 mb-6">Join others who chose {{ selectedWordCount }} words. After the second arrival, the lobby stays open for 30 seconds, up to five players.</p>
             <InkButton variant="soft" block class="mt-auto uppercase tracking-[0.14em] text-[10px]" :disabled="isBusy" @click="findPublic">{{ isBusy ? 'Listening…' : 'Find public room' }}</InkButton>
           </article>
         </div>
@@ -272,33 +273,42 @@ watch(currentUser, async user => {
           </div>
           <div class="flex flex-wrap gap-2">
             <InkButton v-if="isPrivate && isLobby" variant="ghost" compact class="uppercase tracking-[0.12em] text-[9px]" @click="copyInvitation">{{ copyState }}</InkButton>
-            <InkButton variant="ghost" compact class="uppercase tracking-[0.12em] text-[9px]" @click="leave">Leave</InkButton>
+            <InkButton variant="soft" compact class="room-leave-button uppercase tracking-[0.12em] text-[9px]" @click="leave">Leave room</InkButton>
           </div>
         </div>
         <p v-if="visibleError" role="alert" class="mb-5 text-xs">{{ visibleError }}</p>
 
-        <div v-if="isLobby" class="grid lg:grid-cols-[minmax(0,1fr)_19rem] gap-6">
-          <div class="relative isolate px-6 py-8 sm:px-10 sm:py-10">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.24]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <p class="text-[9px] uppercase tracking-[0.24em] opacity-55 mb-4">{{ isPrivate ? 'Private lobby' : roomWordCount + '-word public lobby' }}</p>
-            <h2 class="font-ui-serif text-2xl sm:text-3xl leading-relaxed mb-3">{{ lobbyCount < MIN_PLAYERS ? 'Waiting for another light' : 'The passage is ready' }}</h2>
-            <p class="text-xs leading-relaxed opacity-65 max-w-xl">{{ isPrivate ? 'Invite travelers with the code above. The host may begin once two or more are present.' : (countdown ? 'The shared passage opens in ' + countdown + '…' : 'A calm countdown begins when another traveler arrives.') }}</p>
-            <div class="mt-8">
-              <InkButton v-if="isPrivate && isHost" variant="primary" :disabled="!canStart" class="uppercase tracking-[0.14em] text-[10px]" @click="startMatch">{{ canStart ? 'Begin shared passage' : 'Waiting for one more' }}</InkButton>
-              <span v-else class="text-[10px] uppercase tracking-[0.16em] opacity-55">{{ isPrivate ? 'The host will begin' : 'Matchmaking remains open to five' }}</span>
+        <div v-if="isLobby" class="grid lg:grid-cols-[minmax(0,1fr)_18rem] gap-4 sm:gap-6 items-stretch">
+          <div class="relative isolate px-6 py-8 sm:px-10 sm:py-10 flex flex-col justify-between min-h-[18rem]">
+            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.18]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <div>
+              <p class="text-[9px] uppercase tracking-[0.24em] opacity-60 mb-5">{{ isPrivate ? 'Invitation only' : roomWordCount + ' words · open gathering' }}</p>
+              <h2 class="font-ui-serif text-2xl sm:text-3xl leading-snug mb-3">{{ lobbyCount < MIN_PLAYERS ? 'A place for one more' : isPrivate ? 'Your circle is here' : 'The page opens soon' }}</h2>
+              <p class="text-xs leading-relaxed opacity-70 max-w-lg">{{ isPrivate ? 'Share your invitation. Your circle can begin with two to five people.' : lobbyCount < MIN_PLAYERS ? 'The 30-second gathering begins when a second traveler joins.' : 'Others may join this same passage until the 30 seconds are over, up to five in all.' }}</p>
+            </div>
+            <div class="mt-8 flex flex-wrap items-end gap-x-8 gap-y-4">
+              <template v-if="!isPrivate && countdown > 0">
+                <div class="flex items-baseline gap-2" role="timer" aria-label="Seconds until the passage begins">
+                  <span class="font-ui-serif text-5xl tabular-nums leading-none">{{ countdown }}</span>
+                  <span class="text-[9px] uppercase tracking-[0.16em] opacity-60">seconds</span>
+                </div>
+                <p class="text-[10px] opacity-65">{{ lobbyCount }}/{{ MAX_PLAYERS }} places filled · gathering stays open</p>
+              </template>
+              <InkButton v-else-if="isPrivate && isHost" variant="primary" :disabled="!canStart" class="uppercase tracking-[0.14em] text-[10px]" @click="startMatch">{{ canStart ? 'Begin shared passage' : 'Waiting for one more' }}</InkButton>
+              <span v-else class="text-[10px] uppercase tracking-[0.14em] opacity-65">{{ isPrivate ? 'Your host will begin when ready' : 'Listening for another traveler' }}</span>
             </div>
           </div>
 
-          <aside class="relative isolate px-5 py-6">
-            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.13]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <p class="text-[9px] uppercase tracking-[0.2em] opacity-55 mb-5">Travelers · {{ lobbyCount }}/{{ MAX_PLAYERS }}</p>
-            <ol class="space-y-3">
-              <li v-for="index in MAX_PLAYERS" :key="index" class="flex items-center justify-between gap-3 min-h-8 text-xs">
+          <aside class="relative isolate px-6 py-7 sm:px-7 sm:py-8">
+            <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.11]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <p class="text-[9px] uppercase tracking-[0.2em] opacity-60 mb-5">Here together · {{ lobbyCount }}/{{ MAX_PLAYERS }}</p>
+            <ol class="space-y-2">
+              <li v-for="index in MAX_PLAYERS" :key="index" class="flex items-center justify-between gap-3 min-h-10 text-xs" :class="players[index - 1] ? '' : 'opacity-45'">
                 <template v-if="players[index - 1]">
-                  <span class="flex items-center gap-2 font-ui-serif tracking-wide"><i class="w-2 h-2 rounded-full firefly-idle" :style="{ color: fireflyColors[players[index - 1].seat], backgroundColor: fireflyColors[players[index - 1].seat] }"></i>{{ players[index - 1].name }} <small v-if="players[index - 1].seat === localSeat" class="opacity-50">(you)</small></span>
-                  <span class="text-[8px] uppercase tracking-[0.12em] opacity-45">{{ players[index - 1].connected === false ? 'Returning…' : 'Ready' }}</span>
+                  <span class="flex min-w-0 items-center gap-3 font-ui-serif tracking-wide"><i class="shrink-0 w-2 h-2 rounded-full firefly-idle" :style="{ color: fireflyColors[players[index - 1].seat], backgroundColor: fireflyColors[players[index - 1].seat] }"></i><span class="min-w-0 truncate" :title="players[index - 1].name">{{ players[index - 1].name }}</span> <small v-if="players[index - 1].seat === localSeat" class="opacity-60">you</small></span>
+                  <span class="shrink-0 text-[8px] uppercase tracking-[0.1em] opacity-55">{{ players[index - 1].connected === false ? 'Returning' : 'Here' }}</span>
                 </template>
-                <template v-else><span class="opacity-30">An open place</span></template>
+                <template v-else><span class="flex items-center gap-3"><i class="w-2 h-2 rounded-full border border-current opacity-50"></i> Open place</span></template>
               </li>
             </ol>
           </aside>
@@ -352,6 +362,8 @@ watch(currentUser, async user => {
 </template>
 
 <style scoped>
+:deep(.room-leave-button.trace-ink-button::before) { opacity: .26; }
+:deep(.room-leave-button.trace-ink-button:hover::before) { opacity: .42; }
 .firefly-idle { box-shadow: 0 0 .45rem currentColor; animation: multiplayer-pulse 2.8s ease-in-out infinite; }
 @keyframes multiplayer-pulse {
   0%, 100% { opacity: .35; transform: scale(.85); }

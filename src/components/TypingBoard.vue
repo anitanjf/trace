@@ -126,6 +126,7 @@ const handleMobileBlur = () => {
 }
 
 const handleResize = () => {
+  multiplayerPositions.clear()
   updateMobileViewport()
   calculateLines()
   updateCursor()
@@ -266,14 +267,9 @@ const animateMultiplayerFireflies = now => {
       position = { x: target.x, y: target.y, points: [] }
       multiplayerPositions.set(target.seat, position)
     }
-    // Smooth progress changes without allowing a previous line to drag a tail
-    // across the whole board when the passage wraps or resizes.
-    if (Math.abs(target.x - position.x) > 160 || Math.abs(target.y - position.y) > 100) {
-      position.x = target.x
-      position.y = target.y
-      position.points = []
-    }
-    const easing = reduced ? 1 : 1 - Math.exp(-delta / 145)
+    // Follow rapid keystrokes and line wraps with the same smooth movement;
+    // only actual viewport resizing resets the path.
+    const easing = reduced ? 1 : 1 - Math.exp(-delta / 235)
     position.x += (target.x - position.x) * easing
     position.y += (target.y - position.y) * easing
     const x = position.x + (reduced ? 0 : Math.sin(phase * .52) * 12)
