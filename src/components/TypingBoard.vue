@@ -185,6 +185,11 @@ const playerFireflyColors = {
 }
 
 const playerFireflyColor = seat => playerFireflyColors[seat] || '#FEF08A'
+// Solo lights borrow the active season's ink, but sit between its panel and
+// accent tones: the accent alone is nearly black on light paper.
+const soloFireflyColor = computed(() => settings.value.darkMode
+  ? 'color-mix(in srgb, var(--trace-season-ink) 30%, var(--trace-season-accent))'
+  : 'color-mix(in srgb, var(--trace-season-ink) 70%, var(--trace-season-accent))')
 
 const updateMultiplayerFireflies = async () => {
   await nextTick()
@@ -254,7 +259,7 @@ const updateMultiplayerFireflies = async () => {
       x, y, index,
       lineTop: lineRect.top,
       visible: isSolo || Math.abs(lineRect.top - localRect.top) < Math.max(lineRect.height, localRect.height) * .7,
-      color: isSolo ? 'var(--trace-season-accent)' : playerFireflyColor(player.seat)
+      color: isSolo ? soloFireflyColor.value : playerFireflyColor(player.seat)
     })
   })
 }
@@ -788,8 +793,9 @@ onBeforeUnmount(() => {
             :key="player.seat"
             :d="player.trail"
             :stroke="`url(#firefly-trail-${player.seat})`"
-            :opacity="player.connected ? 1 : .35"
+            :opacity="player.connected ? (props.gameMode === 'multiplayer' ? 1 : .5) : .35"
             class="multiplayer-flight-trail"
+            :class="{ 'solo-flight-trail': props.gameMode !== 'multiplayer' }"
           />
         </svg>
       </div>
@@ -798,9 +804,10 @@ onBeforeUnmount(() => {
         v-for="player in multiplayerFireflies"
         :key="player.seat"
         class="absolute top-0 left-0 z-40 pointer-events-none multiplayer-firefly-glide"
+        :class="{ 'solo-flight-light': props.gameMode !== 'multiplayer' }"
         :style="{
           transform: `translate(${player.x}px, ${player.y}px)`,
-          opacity: player.connected ? 1 : 0.35,
+          opacity: player.connected ? (props.gameMode === 'multiplayer' ? 1 : (settings.darkMode ? .72 : .86)) : .35,
           '--multiplayer-firefly-color': player.color
         }"
         aria-hidden="true"
@@ -896,6 +903,8 @@ onBeforeUnmount(() => {
 .multiplayer-firefly-label { position: absolute; left: .7rem; top: -.7rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .72; }
 .multiplayer-racer-light { display: block; position: absolute; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--multiplayer-firefly-color); box-shadow: 0 0 9px 3px var(--multiplayer-firefly-color), 0 0 20px 5px var(--multiplayer-firefly-color); }
 .multiplayer-flight-trail { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px currentColor); }
+.solo-flight-light .multiplayer-racer-light { width: 5px; height: 5px; margin: -2.5px; box-shadow: 0 0 6px 1px var(--multiplayer-firefly-color), 0 0 13px 2px var(--multiplayer-firefly-color); }
+.solo-flight-trail { stroke-width: 2; filter: none; }
 @keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
 .animate-blink { animation: blink-cursor 1.2s ease-in-out infinite; }
 @keyframes ink-puff { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
