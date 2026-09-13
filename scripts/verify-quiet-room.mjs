@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import {
   buildSharedPassage,
+  calculateMatchStats,
+  canEnterByInvitation,
   canJoinRoom,
   findOpenSeat,
   forfeitReason,
@@ -14,6 +16,7 @@ import {
   PUBLIC_START_DELAY_MS,
   ROOM_GRACE_MS,
   ROOM_SLOTS,
+  shouldRemoveRoomOnLeave,
   WORD_COUNTS,
   shouldStartPublicRoom
 } from '../src/utils/quietRoomProtocol.js'
@@ -62,6 +65,16 @@ delete publicRoom.players.three
 delete publicRoom.players.four
 delete publicRoom.players.five
 assert.equal(shouldStartPublicRoom(publicRoom, now + PUBLIC_START_DELAY_MS), false)
+assert.equal(canEnterByInvitation(publicRoom, 'outsider'), false)
+assert.equal(canEnterByInvitation(publicRoom, 'host'), true)
+assert.equal(canEnterByInvitation({ ...publicRoom, meta: { type: 'private' } }, 'outsider'), true)
+assert.equal(shouldRemoveRoomOnLeave('lobby', true), true)
+assert.equal(shouldRemoveRoomOnLeave('ended', true), false)
+assert.equal(shouldRemoveRoomOnLeave('ended', false), false)
+assert.equal(shouldRemoveRoomOnLeave('playing', true), false)
+assert.deepEqual(calculateMatchStats({ typedCount: 250, keystrokes: 260, mistakes: 13, elapsedMs: 60_000 }), {
+  wpm: 50, accuracy: 95, elapsedMs: 60_000, mistakes: 13, keystrokes: 260
+})
 
 const started = now - MATCH_IDLE_MS
 const contestants = {
@@ -77,4 +90,4 @@ assert.equal(forfeitReason(contestants.three, started, now), 'disconnected')
 assert.equal(forfeitReason(contestants.four, started, now), null)
 assert.equal(getMatchPlayers(contestants, { one: { reason: 'idle' }, three: { reason: 'disconnected' } }).length, 2)
 assert.equal(isRoomExpired({ status: 'playing', expiresAt: now + 1000, hostDisconnectedAt: started }, now), false)
-console.log('Shared Current protocol checks passed.')
+console.log('Shared Passage protocol checks passed.')

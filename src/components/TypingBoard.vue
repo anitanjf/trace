@@ -3,6 +3,7 @@ import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { settings, shouldReduceMotion } from '../store'
 import { playKeystrokeSound, setPracticeAudioPaused } from '../composables/useAudio'
 import SplashScreen from './SplashScreen.vue'
+import { calculateMatchStats } from '../utils/quietRoomProtocol'
 
 const props = defineProps({ 
   quote: { type: Object, required: true },
@@ -318,7 +319,13 @@ watch(typedCount, count => {
   const total = poemCharacters.value.length || 1
   emit('progress', {
     progress: Math.min(100, Math.round((count / total) * 100)),
-    complete: count >= poemCharacters.value.length
+    complete: count >= poemCharacters.value.length,
+    ...(props.gameMode === 'multiplayer' ? calculateMatchStats({
+      typedCount: count,
+      keystrokes: sessionKeystrokes.value,
+      mistakes: sessionMistakes.value,
+      elapsedMs: sessionStartTime.value ? (sessionEndTime.value || Date.now()) - sessionStartTime.value : 0
+    }) : {})
   })
 })
 

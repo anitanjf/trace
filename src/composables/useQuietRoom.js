@@ -13,6 +13,7 @@ import {
 import { auth, db, rtdb } from '../services/firebase'
 import { doc, getDoc } from 'firebase/firestore'
 import {
+  canEnterByInvitation,
   canJoinRoom,
   createRoomCode,
   findOpenSeat,
@@ -30,7 +31,8 @@ import {
   ROOM_LIFETIME_MS,
   ROOM_SLOTS,
   normalizeRoomCode,
-  shouldStartPublicRoom
+  shouldStartPublicRoom,
+  shouldRemoveRoomOnLeave
 } from '../utils/quietRoomProtocol'
 
 const ACTIVE_ROOM_KEY = 'trace_active_multiplayer_room'
@@ -308,7 +310,6 @@ export const useQuietRoom = () => {
         return
       }
 
-      const connected = getConnectedPlayers(nextRoom.players)
       connectionState.value = nextRoom.meta.status
 
       if (nextRoom.meta.status === 'playing') void reconcileMatch()
@@ -322,7 +323,7 @@ export const useQuietRoom = () => {
     stopConnection = onValue(connectedRef, snapshot => {
       isOnline.value = snapshot.val() === true
       if (!isOnline.value) connectionState.value = 'reconnecting'
-      else if (roomCode.value && localSeat.value) void attachPresence().catch(error => {
+      else if (roomCode.value && localSeat.value && room.value?.meta?.status !== 'ended' && !room.value?.meta?.forfeits?.[localSeat.value]) void attachPresence().catch(error => {
         roomError.value = friendlyError(error)
       })
     })
@@ -337,7 +338,7 @@ export const useQuietRoom = () => {
     connectionState.value = 'idle'
   }
 
-  const joinRoom = async rawCode => {
+  const joinRoom = async (rawCode, { fromMatchmaking = false } = {}) => {
     const code = normalizeRoomCode(rawCode)
     roomError.value = ''
     if (!auth.currentUser) return { ok: false, reason: 'auth' }
@@ -354,10 +355,12 @@ export const useQuietRoom = () => {
         await remove(target).catch(() => {})
         return { ok: false, reason: 'expired' }
       }
+      if (!fromMatchmaking && !canEnterByInvitation(current, auth.currentUser.uid)) {
+        return { ok: false, reason: 'public-matchmaking' }
+      }
 
       let seat = findPlayerSeat(current.players, auth.currentUser.uid)
-      if (seat && current.meta.forfeits?.[seat]) return { ok: false, reason: 'forfeited' }
-      if (seat && current.meta.status === 'ended') return { ok: false, reason: 'ended' }
+      if (seat && current.meta.forfeits?.[seat] && current.meta.status !== 'ended') return { ok: false, reason: 'forfeited' }
       if (!seat) {
         if (!canJoinRoom(current, auth.currentUser.uid)) return {
           ok: false,
@@ -389,11 +392,11 @@ export const useQuietRoom = () => {
       room.value = snapshot.val()
       const playerName = await resolvePlayerNames()
       const currentName = playerName(seat)
-      if (room.value?.players?.[seat]?.name !== currentName) {
+      if (room.value?.meta?.status !== 'ended' && room.value?.players?.[seat]?.name !== currentName) {
         await update(databaseRef(rtdb, roomPath(code) + '/players/' + seat), { name: currentName })
       }
       await rememberRoom(code)
-      await attachPresence()
+      if (room.value?.meta?.status !== 'ended') await attachPresence()
       const offsetSnapshot = await get(databaseRef(rtdb, '.info/serverTimeOffset')).catch(() => null)
       serverOffset.value = Number(offsetSnapshot?.val()) || 0
       observeRoom()
@@ -470,7 +473,7 @@ export const useQuietRoom = () => {
         .sort((a, b) => Number(a[1]?.createdAt || 0) - Number(b[1]?.createdAt || 0))
 
       for (const [code] of entries) {
-        const result = await joinRoom(code)
+        const result = await joinRoom(code, { fromMatchmaking: true })
         if (result.ok) return result
         if (['missing', 'expired', 'full', 'started'].includes(result.reason)) {
           await remove(databaseRef(rtdb, openPath(code))).catch(() => {})
@@ -495,14 +498,19 @@ export const useQuietRoom = () => {
     return result
   }
 
-  const publishProgress = ({ progress = 0, complete = false } = {}) => {
-    if (!roomCode.value || !localSeat.value) return
+  const publishProgress = ({ progress = 0, complete = false, wpm = 0, accuracy = 100, elapsedMs = 0, mistakes = 0, keystrokes = 0 } = {}) => {
+    if (!roomCode.value || !localSeat.value || !isPlaying.value || localPlayer.value?.complete) return
     clearTimeout(progressTimer)
     progressTimer = setTimeout(() => {
       update(databaseRef(rtdb, roomPath(roomCode.value) + '/players/' + localSeat.value), {
         progress: Math.max(0, Math.min(100, Number(progress) || 0)),
         complete: Boolean(complete),
         finishedAt: complete ? serverTimestamp() : null,
+        wpm: Math.max(0, Math.round(Number(wpm) || 0)),
+        accuracy: Math.max(0, Math.min(100, Math.round(Number(accuracy) || 0))),
+        elapsedMs: Math.max(0, Math.round(Number(elapsedMs) || 0)),
+        mistakes: Math.max(0, Math.round(Number(mistakes) || 0)),
+        keystrokes: Math.max(0, Math.round(Number(keystrokes) || 0)),
         lastActiveAt: serverTimestamp(),
         lastSeen: serverTimestamp()
       }).catch(error => { roomError.value = friendlyError(error) })
@@ -511,6 +519,7 @@ export const useQuietRoom = () => {
 
   const suspendRoom = async () => {
     if (!roomCode.value || !localSeat.value) return
+    if (hasEnded.value) return leaveRoom()
     intentionallyLeaving = true
     clearListeners()
     await disconnectPlayer?.cancel().catch(() => {})
@@ -541,18 +550,16 @@ export const useQuietRoom = () => {
     const code = roomCode.value
     const wasHost = isHost.value
     const wasPlaying = isPlaying.value
+    const wasEnded = hasEnded.value
     if (wasPlaying) {
       await update(databaseRef(rtdb, roomPath(code) + '/players/' + localSeat.value), {
         connected: false,
         disconnectedAt: serverTimestamp()
       }).catch(() => {})
-    } else {
+    } else if (!wasEnded) {
       await remove(databaseRef(rtdb, roomPath(code) + '/players/' + localSeat.value)).catch(() => {})
     }
-    if (wasPlaying) {
-      // Keep the departing traveler on the final page so the other clients can
-      // record a DNF and preserve an honest finishing order.
-    } else if (wasHost) {
+    if (!wasEnded && shouldRemoveRoomOnLeave(room.value?.meta?.status, wasHost)) {
       await remove(databaseRef(rtdb, roomPath(code))).catch(() => {})
       await remove(databaseRef(rtdb, openPath(code))).catch(() => {})
     }

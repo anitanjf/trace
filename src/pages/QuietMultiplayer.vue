@@ -90,6 +90,11 @@ const fireflyColors = {
 
 const winner = computed(() => finishers.value.find(player => !forfeits.value[player.seat]) || null)
 const playerInitials = name => String(name || 'Traveler').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()
+const matchTime = elapsedMs => {
+  if (!Number.isFinite(Number(elapsedMs)) || Number(elapsedMs) <= 0) return '—'
+  const seconds = Math.round(Number(elapsedMs) / 1000)
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
 
 watch([() => room.value?.meta?.startsAt, serverOffset], ([startsAt]) => {
   clearInterval(countdownTimer)
@@ -110,6 +115,7 @@ const describeFailure = result => ({
   started: 'That passage has already begun.',
   collision: 'The room could not be formed. Please try once more.',
   auth: 'Sign in to enter multiplayer.',
+  'public-matchmaking': 'Public gatherings are found through matchmaking. Choose Find public room instead.',
   forfeited: 'Your light has left this passage. Gather again in a new room.',
   ended: 'This passage has already come to rest. Gather again in a new room.'
 }[result?.reason] || result?.message || 'The room could not be opened.')
@@ -121,8 +127,8 @@ const finishEntry = result => {
   }
   passageIndex.value = result.passageIndex
   selectedWordCount.value = Number(room.value?.meta?.wordCount) || selectedWordCount.value
-  joinCode.value = result.code
-  router.replace({ query: { room: result.code } })
+  joinCode.value = room.value?.meta?.type === 'private' ? result.code : ''
+  router.replace({ query: room.value?.meta?.type === 'private' ? { room: result.code } : {} })
 }
 
 const withAuth = action => {
@@ -187,10 +193,6 @@ const copyInvitation = async () => {
   window.setTimeout(() => { copyState.value = 'Copy invitation' }, 2200)
 }
 
-const handleComplete = () => {
-  publishProgress({ progress: 100, complete: true })
-}
-
 onMounted(async () => {
   matchClockTimer = setInterval(() => { matchNow.value = Date.now() }, 1000)
   const requested = normalizeRoomCode(route.query.room)
@@ -223,9 +225,8 @@ watch(currentUser, async user => {
     <div class="mx-auto w-full max-w-6xl">
       <header class="flex items-start justify-between gap-5 mb-8 sm:mb-10">
         <div>
-          <p class="text-[9px] uppercase tracking-[0.34em] opacity-55 mb-2">One page · many paths</p>
-          <h1 class="text-3xl sm:text-4xl tracking-[0.2em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Shared Current</h1>
-          <p class="mt-3 text-[10px] tracking-[0.08em] opacity-65">Follow your light. Find your rhythm beside others.</p>
+          <h1 class="text-3xl sm:text-4xl tracking-[0.2em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Shared Passage</h1>
+          <p class="mt-3 text-[10px] tracking-[0.08em] opacity-65">A quiet race across the same page.</p>
         </div>
         <InkButton v-if="!roomCode" variant="soft" compact class="uppercase tracking-[0.16em] text-[10px]" @click="returnHome">Return home</InkButton>
       </header>
@@ -281,7 +282,8 @@ watch(currentUser, async user => {
         <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <p class="text-[8px] uppercase tracking-[0.22em] opacity-50">{{ isPrivate ? 'Private invitation' : 'Public gathering' }} · {{ roomWordCount }} words</p>
-            <p class="mt-1 text-lg tracking-[0.3em] font-ui-serif">{{ roomCode }}</p>
+            <p v-if="isPrivate" class="mt-1 text-lg tracking-[0.3em] font-ui-serif">{{ roomCode }}</p>
+            <p v-else class="mt-1 text-xs opacity-65">Found through the gathering, not an invitation.</p>
           </div>
           <div class="flex flex-wrap gap-2">
             <InkButton v-if="isPrivate && isLobby" variant="ghost" compact class="uppercase tracking-[0.12em] text-[9px]" @click="copyInvitation">{{ copyState }}</InkButton>
@@ -340,13 +342,12 @@ watch(currentUser, async user => {
             <TypingBoard
               v-else-if="!localForfeit"
               :quote="passage"
-              :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'"
+              :season-name="seasons[settings.lockedSeason]?.name || 'Shared Passage'"
               :passage-number="roomWordCount"
               game-mode="multiplayer"
               :multiplayer-players="players"
               :local-seat="localSeat"
               @progress="publishProgress"
-              @passage-complete="handleComplete"
             />
           </section>
         </div>
@@ -355,7 +356,7 @@ watch(currentUser, async user => {
           <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.23]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
           <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">The page is complete</p>
           <h2 class="font-ui-serif text-2xl sm:text-3xl mb-3">{{ winner ? winner.name + ' reached the shore first.' : 'The passage rests here.' }}</h2>
-          <p class="text-xs opacity-60">Every traveler followed the same passage in their own time.</p>
+          <p class="text-xs opacity-60">{{ roomWordCount }} words · Every traveler followed the same passage in their own time.</p>
           <ol class="my-9 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end" aria-label="First three travelers">
             <li v-for="(player, index) in finishers.slice(0, 3)" :key="player.seat" class="relative isolate flex flex-col items-center gap-2 px-4 py-7" :class="index === 0 ? 'sm:py-10' : ''">
               <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl" :style="{ backgroundColor: 'var(--trace-season-ink)', opacity: index === 0 ? .25 : .12, filter: 'url(#ink-blot)' }"></span>
@@ -363,10 +364,12 @@ watch(currentUser, async user => {
               <span class="grid place-items-center w-14 h-14 rounded-full font-ui-serif text-lg" :style="{ backgroundColor: fireflyColors[player.seat] + '33', boxShadow: `0 0 22px ${fireflyColors[player.seat]}55` }" aria-hidden="true">{{ playerInitials(player.name) }}</span>
               <strong class="font-ui-serif font-normal text-base truncate max-w-full" :title="player.name">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-60">(you)</small></strong>
               <span class="text-[9px] uppercase tracking-[0.14em] opacity-60">{{ forfeits[player.seat] ? 'DNF · ' + forfeits[player.seat].reason : player.complete ? 'Finished' : 'Last light standing' }}</span>
+              <span class="mt-2 font-ui-serif text-xl tabular-nums">{{ player.keystrokes ? player.wpm : '—' }} <small class="text-[9px] font-ui-sans uppercase tracking-widest opacity-60">WPM</small></span>
+              <span class="text-[10px] opacity-70 tabular-nums">{{ player.keystrokes ? player.accuracy + '% accuracy' : 'No typing recorded' }} · {{ matchTime(player.elapsedMs) }}</span>
             </li>
           </ol>
           <ol v-if="finishers.length > 3" class="mx-auto max-w-sm mb-8 space-y-3 text-left" start="4" aria-label="Other travelers">
-            <li v-for="(player, index) in finishers.slice(3)" :key="player.seat" class="flex gap-3 text-xs"><span>{{ index + 4 }}.</span><span class="flex-1">{{ player.name }}</span><span class="opacity-60">{{ forfeits[player.seat] ? 'DNF' : player.complete ? 'Finished' : 'Still here' }}</span></li>
+            <li v-for="(player, index) in finishers.slice(3)" :key="player.seat" class="flex flex-wrap gap-x-3 gap-y-1 text-xs"><span>{{ index + 4 }}.</span><span class="flex-1">{{ player.name }}</span><span class="opacity-60">{{ forfeits[player.seat] ? 'DNF' : player.complete ? 'Finished' : 'Still here' }} · {{ player.keystrokes ? player.wpm + ' WPM · ' + player.accuracy + '%' : 'No typing recorded' }} · {{ matchTime(player.elapsedMs) }}</span></li>
           </ol>
           <InkButton variant="primary" @click="leave">Back to multiplayer</InkButton>
         </div>
