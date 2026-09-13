@@ -25,14 +25,16 @@ const passageIndex = ref(0)
 const selectedWordCount = ref(50)
 const showAuth = ref(false)
 const pendingAction = ref(null)
-const showEndedModal = ref(false)
 const countdown = ref(0)
+const matchNow = ref(Date.now())
 let countdownTimer = null
+let matchClockTimer = null
 
 const {
   roomCode,
   room,
   players,
+  localPlayer,
   connectedPlayers,
   localSeat,
   isHost,
@@ -66,7 +68,13 @@ const visibleError = computed(() => joinError.value || roomError.value)
 const lobbyCount = computed(() => connectedPlayers.value.length)
 const isPrivate = computed(() => room.value?.meta?.type === 'private')
 const roomWordCount = computed(() => Number(room.value?.meta?.wordCount) || selectedWordCount.value)
+const forfeits = computed(() => room.value?.meta?.forfeits || {})
+const localForfeit = computed(() => forfeits.value[localSeat.value] || null)
+const idleRemaining = computed(() => Math.max(0, 30 - Math.floor(
+  (matchNow.value + serverOffset.value - Math.max(Number(room.value?.meta?.startedAt || 0), Number(localPlayer.value?.lastActiveAt || 0))) / 1000
+)))
 const finishers = computed(() => [...players.value].sort((a, b) => {
+  if (Boolean(forfeits.value[a.seat]) !== Boolean(forfeits.value[b.seat])) return forfeits.value[a.seat] ? 1 : -1
   if (a.complete !== b.complete) return a.complete ? -1 : 1
   if (a.complete && b.complete) return Number(a.finishedAt || Infinity) - Number(b.finishedAt || Infinity)
   return Number(b.progress || 0) - Number(a.progress || 0)
@@ -80,9 +88,8 @@ const fireflyColors = {
   five: '#C6AFE5'
 }
 
-watch(hasEnded, ended => {
-  if (ended && room.value?.meta?.endedReason === 'traveler-left') showEndedModal.value = true
-})
+const winner = computed(() => finishers.value.find(player => !forfeits.value[player.seat]) || null)
+const playerInitials = name => String(name || 'Traveler').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()
 
 watch([() => room.value?.meta?.startsAt, serverOffset], ([startsAt]) => {
   clearInterval(countdownTimer)
@@ -102,7 +109,9 @@ const describeFailure = result => ({
   full: 'Five travelers already share this passage.',
   started: 'That passage has already begun.',
   collision: 'The room could not be formed. Please try once more.',
-  auth: 'Sign in to enter multiplayer.'
+  auth: 'Sign in to enter multiplayer.',
+  forfeited: 'Your light has left this passage. Gather again in a new room.',
+  ended: 'This passage has already come to rest. Gather again in a new room.'
 }[result?.reason] || result?.message || 'The room could not be opened.')
 
 const finishEntry = result => {
@@ -164,7 +173,6 @@ const returnHome = async () => {
 const leave = async () => {
   await leaveRoom()
   joinCode.value = ''
-  showEndedModal.value = false
   router.replace({ query: {} })
 }
 
@@ -184,12 +192,16 @@ const handleComplete = () => {
 }
 
 onMounted(async () => {
+  matchClockTimer = setInterval(() => { matchNow.value = Date.now() }, 1000)
   const requested = normalizeRoomCode(route.query.room)
   if (requested.length === ROOM_CODE_LENGTH) await enterRoom(requested)
   else if (currentUser.value) finishEntry(await resumeRoom())
 })
 
-onBeforeUnmount(() => clearInterval(countdownTimer))
+onBeforeUnmount(() => {
+  clearInterval(countdownTimer)
+  clearInterval(matchClockTimer)
+})
 
 watch(currentUser, async user => {
   if (!user) return
@@ -273,7 +285,7 @@ watch(currentUser, async user => {
           </div>
           <div class="flex flex-wrap gap-2">
             <InkButton v-if="isPrivate && isLobby" variant="ghost" compact class="uppercase tracking-[0.12em] text-[9px]" @click="copyInvitation">{{ copyState }}</InkButton>
-            <InkButton variant="soft" compact class="room-leave-button uppercase tracking-[0.12em] text-[9px]" @click="leave">Leave room</InkButton>
+            <InkButton v-if="!hasEnded" variant="soft" compact class="room-leave-button uppercase tracking-[0.12em] text-[9px]" @click="leave">Leave room</InkButton>
           </div>
         </div>
         <p v-if="visibleError" role="alert" class="mb-5 text-xs">{{ visibleError }}</p>
@@ -315,9 +327,18 @@ watch(currentUser, async user => {
         </div>
 
         <div v-else-if="isPlaying">
+          <p v-if="!localPlayer?.complete && !localForfeit && room?.meta?.startedAt" class="mb-3 text-center text-[10px] uppercase tracking-[0.14em] opacity-60" role="timer">{{ idleRemaining }}s until your light rests without a keystroke</p>
+          <p v-if="Object.keys(forfeits).length" class="mb-4 text-center text-[10px] tracking-wide opacity-70" role="status">{{ Object.keys(forfeits).length }} {{ Object.keys(forfeits).length === 1 ? 'traveler has' : 'travelers have' }} left the passage · the current continues while two lights remain.</p>
           <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.1]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
+            <div v-if="localPlayer?.complete" class="text-center px-6 py-12" role="status" aria-live="polite">
+              <p class="text-[9px] uppercase tracking-[0.25em] opacity-60 mb-5">Your light has reached the shore</p>
+              <span class="mx-auto mb-7 block w-5 h-5 rounded-full firefly-idle" :style="{ color: fireflyColors[localSeat], backgroundColor: fireflyColors[localSeat] }"></span>
+              <h2 class="font-ui-serif text-2xl sm:text-3xl mb-4">Rest here while the others finish.</h2>
+              <p class="text-xs opacity-65">Your passage is complete · {{ players.filter(player => player.complete && !forfeits[player.seat]).length }} of {{ players.filter(player => !forfeits[player.seat]).length }} lights have arrived.</p>
+            </div>
             <TypingBoard
+              v-else-if="!localForfeit"
               :quote="passage"
               :season-name="seasons[settings.lockedSeason]?.name || 'Shared Current'"
               :passage-number="roomWordCount"
@@ -330,30 +351,35 @@ watch(currentUser, async user => {
           </section>
         </div>
 
-        <div v-else-if="hasEnded && room?.meta?.endedReason === 'complete'" class="relative isolate mx-auto max-w-2xl px-7 py-12 text-center">
+        <div v-else-if="hasEnded" class="relative isolate mx-auto max-w-3xl px-7 py-12 text-center">
           <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.23]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-          <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">All lights have arrived</p>
-          <h2 class="font-ui-serif text-2xl sm:text-3xl mb-3">Many marks, one quiet page.</h2>
-          <ol class="mx-auto max-w-sm my-8 space-y-3 text-left">
-            <li v-for="(player, index) in finishers" :key="player.seat" class="flex items-center gap-3 text-sm">
-              <span class="w-6 text-center font-ui-serif opacity-50">{{ index + 1 }}</span>
-              <i class="w-2.5 h-2.5 rounded-full firefly-idle" :style="{ color: fireflyColors[player.seat], backgroundColor: fireflyColors[player.seat] }"></i>
-              <span class="font-ui-serif">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-50">(you)</small></span>
+          <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">The page is complete</p>
+          <h2 class="font-ui-serif text-2xl sm:text-3xl mb-3">{{ winner ? winner.name + ' reached the shore first.' : 'The passage rests here.' }}</h2>
+          <p class="text-xs opacity-60">Every traveler followed the same passage in their own time.</p>
+          <ol class="my-9 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end" aria-label="First three travelers">
+            <li v-for="(player, index) in finishers.slice(0, 3)" :key="player.seat" class="relative isolate flex flex-col items-center gap-2 px-4 py-7" :class="index === 0 ? 'sm:py-10' : ''">
+              <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl" :style="{ backgroundColor: 'var(--trace-season-ink)', opacity: index === 0 ? .25 : .12, filter: 'url(#ink-blot)' }"></span>
+              <span class="text-[9px] uppercase tracking-[0.24em] opacity-55">{{ index === 0 ? 'First light' : index === 1 ? 'Second light' : 'Third light' }}</span>
+              <span class="grid place-items-center w-14 h-14 rounded-full font-ui-serif text-lg" :style="{ backgroundColor: fireflyColors[player.seat] + '33', boxShadow: `0 0 22px ${fireflyColors[player.seat]}55` }" aria-hidden="true">{{ playerInitials(player.name) }}</span>
+              <strong class="font-ui-serif font-normal text-base truncate max-w-full" :title="player.name">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-60">(you)</small></strong>
+              <span class="text-[9px] uppercase tracking-[0.14em] opacity-60">{{ forfeits[player.seat] ? 'DNF · ' + forfeits[player.seat].reason : player.complete ? 'Finished' : 'Last light standing' }}</span>
             </li>
           </ol>
-          <p class="text-xs opacity-60 mb-8">The order belongs only to this moment. The practice remains equal.</p>
-          <InkButton variant="primary" @click="leave">Return to multiplayer</InkButton>
+          <ol v-if="finishers.length > 3" class="mx-auto max-w-sm mb-8 space-y-3 text-left" start="4" aria-label="Other travelers">
+            <li v-for="(player, index) in finishers.slice(3)" :key="player.seat" class="flex gap-3 text-xs"><span>{{ index + 4 }}.</span><span class="flex-1">{{ player.name }}</span><span class="opacity-60">{{ forfeits[player.seat] ? 'DNF' : player.complete ? 'Finished' : 'Still here' }}</span></li>
+          </ol>
+          <InkButton variant="primary" @click="leave">Back to multiplayer</InkButton>
         </div>
       </section>
     </div>
 
-    <div v-if="showEndedModal" class="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/45 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="ended-title">
+    <div v-if="localForfeit" class="fixed inset-0 z-50 flex items-center justify-center p-5 bg-black/45 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="ended-title">
       <div class="relative isolate w-full max-w-md px-8 py-10 text-center" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
         <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-95" :style="{ backgroundColor: 'var(--trace-season-soft)', filter: 'url(#ink-blot)' }"></span>
-        <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">The current has changed</p>
-        <h2 id="ended-title" class="font-ui-serif text-2xl leading-relaxed mb-4">One light left the path. The shared passage returns to stillness.</h2>
-        <p class="text-xs leading-relaxed opacity-65 mb-8">No progress was lost from your own practice. Gather again when the evening is ready.</p>
-        <InkButton variant="primary" @click="leave">Return to multiplayer</InkButton>
+        <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">Your light has rested · DNF</p>
+        <h2 id="ended-title" class="font-ui-serif text-2xl leading-relaxed mb-4">{{ localForfeit.reason === 'idle' ? 'The page waited thirty quiet seconds, then let your light drift away.' : 'The thread of your connection loosened, and your light left this passage.' }}</h2>
+        <p class="text-xs leading-relaxed opacity-65 mb-8">You have been disconnected from this match. The other travelers may continue; another page awaits you.</p>
+        <InkButton variant="primary" @click="leave">Back to multiplayer</InkButton>
       </div>
     </div>
 

@@ -17,7 +17,9 @@ import {
   createRoomCode,
   findOpenSeat,
   findPlayerSeat,
+  forfeitReason,
   getConnectedPlayers,
+  getMatchPlayers,
   getRoomPlayers,
   isRoomExpired,
   MAX_PLAYERS,
@@ -74,10 +76,15 @@ export const useQuietRoom = () => {
   let progressTimer = null
   let publicStartTimer = null
   let cleanupTimer = null
+  let matchWatchdog = null
+  let reconciling = false
   let intentionallyLeaving = false
 
-  const players = computed(() => getRoomPlayers(room.value?.players))
+  const players = computed(() => room.value?.meta?.status === 'lobby'
+    ? getRoomPlayers(room.value?.players)
+    : getMatchPlayers(room.value?.players))
   const connectedPlayers = computed(() => getConnectedPlayers(room.value?.players))
+  const matchPlayers = computed(() => getMatchPlayers(room.value?.players, room.value?.meta?.forfeits))
   const localPlayer = computed(() => room.value?.players?.[localSeat.value] || null)
   const isHost = computed(() => room.value?.meta?.hostUid === auth.currentUser?.uid)
   const isLobby = computed(() => room.value?.meta?.status === 'lobby')
@@ -106,8 +113,10 @@ export const useQuietRoom = () => {
     stopOffset = null
     clearTimeout(progressTimer)
     clearTimeout(publicStartTimer)
+    clearInterval(matchWatchdog)
     progressTimer = null
     publicStartTimer = null
+    matchWatchdog = null
   }
 
   const rememberRoom = async code => {
@@ -185,6 +194,39 @@ export const useQuietRoom = () => {
     await remove(databaseRef(rtdb, openPath(roomCode.value))).catch(() => {})
   }
 
+  // Every connected client checks the shared clock. A backgrounded or abruptly
+  // disconnected client does not need to run its own timer to be disqualified.
+  const reconcileMatch = async () => {
+    const code = roomCode.value
+    if (!code || room.value?.meta?.status !== 'playing' || !isOnline.value || reconciling) return
+    reconciling = true
+    try {
+      const snapshot = await get(databaseRef(rtdb, roomPath(code))).catch(() => null)
+      const current = snapshot?.val()
+      if (roomCode.value !== code || current?.meta?.status !== 'playing') return
+      const now = Date.now() + serverOffset.value
+      const startedAt = Number(current.meta.startedAt || 0)
+      if (!startedAt) return
+      const pending = getMatchPlayers(current.players, current.meta.forfeits)
+        .map(player => ({ player, reason: forfeitReason(player, startedAt, now) }))
+        .filter(entry => entry.reason)
+      for (const { player, reason } of pending) {
+        if (roomCode.value !== code) return
+        const target = databaseRef(rtdb, roomPath(code) + '/meta/forfeits/' + player.seat)
+        await runTransaction(target, value => value || { uid: player.uid, reason, at: now }, { applyLocally: false }).catch(error => {
+          roomError.value = friendlyError(error)
+        })
+      }
+      const latest = pending.length ? (await get(databaseRef(rtdb, roomPath(code))).catch(() => null))?.val() : current
+      if (roomCode.value !== code || latest?.meta?.status !== 'playing') return
+      const remaining = getMatchPlayers(latest.players, latest.meta.forfeits)
+      if (remaining.length <= 1) await endMatch('last-light')
+      else if (remaining.every(player => player.complete)) await endMatch('complete')
+    } finally {
+      reconciling = false
+    }
+  }
+
   const startMatch = async () => {
     if (!canStart.value) return { ok: false, reason: 'players' }
     await update(databaseRef(rtdb, roomPath(roomCode.value) + '/meta'), {
@@ -249,6 +291,14 @@ export const useQuietRoom = () => {
       }
       room.value = nextRoom
 
+      if (nextRoom.meta?.status === 'playing' && localSeat.value && nextRoom.meta?.forfeits?.[localSeat.value] && nextRoom.players?.[localSeat.value]?.connected) {
+        void update(databaseRef(rtdb, roomPath(roomCode.value) + '/players/' + localSeat.value), {
+          connected: false,
+          disconnectedAt: serverTimestamp()
+        }).catch(error => { roomError.value = friendlyError(error) })
+        void forgetRoom()
+      }
+
       if (isRoomExpired(nextRoom.meta)) {
         connectionState.value = 'expired'
         roomError.value = 'The invitation has faded after thirty quiet seconds.'
@@ -261,13 +311,7 @@ export const useQuietRoom = () => {
       const connected = getConnectedPlayers(nextRoom.players)
       connectionState.value = nextRoom.meta.status
 
-      if (nextRoom.meta.status === 'playing') {
-        if (connected.length < MIN_PLAYERS) {
-          void endMatch('traveler-left')
-        } else if (connected.length > 0 && connected.every(player => player.complete)) {
-          void endMatch('complete')
-        }
-      }
+      if (nextRoom.meta.status === 'playing') void reconcileMatch()
       coordinatePublicStart()
     }, error => {
       roomError.value = friendlyError(error)
@@ -282,6 +326,7 @@ export const useQuietRoom = () => {
         roomError.value = friendlyError(error)
       })
     })
+    matchWatchdog = setInterval(() => { if (isPlaying.value) void reconcileMatch() }, 1000)
   }
 
   const resetLocalRoom = () => {
@@ -311,6 +356,8 @@ export const useQuietRoom = () => {
       }
 
       let seat = findPlayerSeat(current.players, auth.currentUser.uid)
+      if (seat && current.meta.forfeits?.[seat]) return { ok: false, reason: 'forfeited' }
+      if (seat && current.meta.status === 'ended') return { ok: false, reason: 'ended' }
       if (!seat) {
         if (!canJoinRoom(current, auth.currentUser.uid)) return {
           ok: false,
@@ -456,6 +503,7 @@ export const useQuietRoom = () => {
         progress: Math.max(0, Math.min(100, Number(progress) || 0)),
         complete: Boolean(complete),
         finishedAt: complete ? serverTimestamp() : null,
+        lastActiveAt: serverTimestamp(),
         lastSeen: serverTimestamp()
       }).catch(error => { roomError.value = friendlyError(error) })
     }, PROGRESS_THROTTLE_MS)
@@ -493,16 +541,17 @@ export const useQuietRoom = () => {
     const code = roomCode.value
     const wasHost = isHost.value
     const wasPlaying = isPlaying.value
-    await remove(databaseRef(rtdb, roomPath(code) + '/players/' + localSeat.value)).catch(() => {})
     if (wasPlaying) {
-      const snapshot = await get(databaseRef(rtdb, roomPath(code))).catch(() => null)
-      if (snapshot?.exists() && getConnectedPlayers(snapshot.val()?.players).length < MIN_PLAYERS) {
-        await update(databaseRef(rtdb, roomPath(code) + '/meta'), {
-          status: 'ended',
-          endedReason: 'traveler-left',
-          endedAt: serverTimestamp()
-        }).catch(() => {})
-      }
+      await update(databaseRef(rtdb, roomPath(code) + '/players/' + localSeat.value), {
+        connected: false,
+        disconnectedAt: serverTimestamp()
+      }).catch(() => {})
+    } else {
+      await remove(databaseRef(rtdb, roomPath(code) + '/players/' + localSeat.value)).catch(() => {})
+    }
+    if (wasPlaying) {
+      // Keep the departing traveler on the final page so the other clients can
+      // record a DNF and preserve an honest finishing order.
     } else if (wasHost) {
       await remove(databaseRef(rtdb, roomPath(code))).catch(() => {})
       await remove(databaseRef(rtdb, openPath(code))).catch(() => {})
@@ -520,6 +569,7 @@ export const useQuietRoom = () => {
     roomCode,
     room,
     players,
+    matchPlayers,
     connectedPlayers,
     localPlayer,
     localSeat,
