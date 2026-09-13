@@ -3,10 +3,13 @@ import {
   buildSharedPassage,
   canJoinRoom,
   findOpenSeat,
+  forfeitReason,
   getConnectedPlayers,
+  getMatchPlayers,
   getRoomPlayers,
   isRoomExpired,
   MAX_PLAYERS,
+  MATCH_IDLE_MS,
   MIN_PLAYERS,
   PUBLIC_START_DELAY_MS,
   ROOM_GRACE_MS,
@@ -17,6 +20,7 @@ import {
 
 assert.equal(MIN_PLAYERS, 2)
 assert.equal(MAX_PLAYERS, 5)
+assert.equal(MATCH_IDLE_MS, 30_000)
 assert.equal(PUBLIC_START_DELAY_MS, 30_000)
 assert.deepEqual(ROOM_SLOTS, ['one', 'two', 'three', 'four', 'five'])
 assert.deepEqual(WORD_COUNTS, [50, 100, 200])
@@ -58,4 +62,19 @@ delete publicRoom.players.three
 delete publicRoom.players.four
 delete publicRoom.players.five
 assert.equal(shouldStartPublicRoom(publicRoom, now + PUBLIC_START_DELAY_MS), false)
+
+const started = now - MATCH_IDLE_MS
+const contestants = {
+  one: { uid: 'host', connected: true, lastActiveAt: started },
+  two: { uid: 'guest', connected: true, lastActiveAt: now - 1000 },
+  three: { uid: 'third', connected: false, disconnectedAt: now - 1000 },
+  four: { uid: 'finished', connected: false, complete: true }
+}
+assert.equal(forfeitReason(contestants.one, started, now - 1), null)
+assert.equal(forfeitReason(contestants.one, started, now), 'idle')
+assert.equal(forfeitReason(contestants.two, started, now), null)
+assert.equal(forfeitReason(contestants.three, started, now), 'disconnected')
+assert.equal(forfeitReason(contestants.four, started, now), null)
+assert.equal(getMatchPlayers(contestants, { one: { reason: 'idle' }, three: { reason: 'disconnected' } }).length, 2)
+assert.equal(isRoomExpired({ status: 'playing', expiresAt: now + 1000, hostDisconnectedAt: started }, now), false)
 console.log('Shared Current protocol checks passed.')

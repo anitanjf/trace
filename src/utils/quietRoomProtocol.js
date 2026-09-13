@@ -2,6 +2,7 @@ export const ROOM_CODE_LENGTH = 7
 export const ROOM_GRACE_MS = 30_000
 export const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
 export const PUBLIC_START_DELAY_MS = 30_000
+export const MATCH_IDLE_MS = 30_000
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 5
 export const WORD_COUNTS = [50, 100, 200]
@@ -71,9 +72,20 @@ export const findOpenSeat = (players = {}, now = Date.now()) =>
 export const isRoomExpired = (meta, now = Date.now()) => {
   if (!meta) return true
   if (Number(meta.expiresAt || 0) <= now) return true
-  return Boolean(meta.hostDisconnectedAt) &&
+  return meta.status === 'lobby' && Boolean(meta.hostDisconnectedAt) &&
     now > Number(meta.hostDisconnectedAt) + ROOM_GRACE_MS
 }
+
+export const forfeitReason = (player, startedAt, now = Date.now()) => {
+  if (!player?.uid || player.complete) return null
+  if (player.connected === false) return 'disconnected'
+  const lastActivity = Math.max(Number(startedAt) || 0, Number(player.lastActiveAt) || 0)
+  return lastActivity && now - lastActivity >= MATCH_IDLE_MS ? 'idle' : null
+}
+
+export const getMatchPlayers = (players = {}, forfeits = {}) =>
+  ROOM_SLOTS.map(seat => ({ seat, ...(players?.[seat] || {}) }))
+    .filter(player => player.uid && !forfeits?.[player.seat])
 
 export const canJoinRoom = (room, uid, now = Date.now()) => {
   if (!room?.meta || isRoomExpired(room.meta, now)) return false

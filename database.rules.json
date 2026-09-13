@@ -27,6 +27,12 @@
           "startsAt": { ".write": "auth != null" },
           "endedAt": { ".write": "auth != null" },
           "endedReason": { ".write": "auth != null" },
+          "forfeits": {
+            "$seat": {
+              ".write": "auth != null && ($seat === 'one' || $seat === 'two' || $seat === 'three' || $seat === 'four' || $seat === 'five') && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() === 'playing' && !data.exists() && (root.child('multiplayerRooms/' + $roomId + '/players/one/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/two/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/three/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/four/uid').val() === auth.uid || root.child('multiplayerRooms/' + $roomId + '/players/five/uid').val() === auth.uid) && root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/uid').val() === newData.child('uid').val() && root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/complete').val() === false && ((newData.child('reason').val() === 'disconnected' && root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/connected').val() === false) || (newData.child('reason').val() === 'idle' && now >= 30000 + root.child('multiplayerRooms/' + $roomId + '/meta/startedAt').val() && (!root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/lastActiveAt').isNumber() || now >= 30000 + root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/lastActiveAt').val())))",
+              ".validate": "newData.hasChildren(['uid', 'reason', 'at']) && newData.child('uid').isString() && newData.child('at').isNumber() && (newData.child('reason').val() === 'idle' || newData.child('reason').val() === 'disconnected')"
+            }
+          },
           "hostDisconnectedAt": {
             ".write": "auth != null && root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid",
             ".validate": "!newData.exists() || newData.isNumber()"

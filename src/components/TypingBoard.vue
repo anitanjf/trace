@@ -204,6 +204,8 @@ const updateMultiplayerFireflies = async () => {
   const spans = textContainer.value.querySelectorAll('.char-span')
   if (!spans.length) return
   const areaRect = typingArea.value.getBoundingClientRect()
+  const localIndex = Math.min(spans.length - 1, typedCount.value)
+  const localRect = spans[localIndex]?.getBoundingClientRect()
   const racers = props.multiplayerPlayers.filter(player => player?.seat)
   multiplayerFieldSize.value = { width: areaRect.width, height: areaRect.height }
   const activeSeats = new Set(racers.map(player => player.seat))
@@ -230,6 +232,8 @@ const updateMultiplayerFireflies = async () => {
       name: player.name,
       connected: player.connected !== false,
       x, y, index,
+      lineTop: rect.top,
+      visible: Boolean(localRect && Math.abs(rect.top - localRect.top) < Math.max(rect.height, localRect.height) * .7),
       color: playerFireflyColor(player.seat)
     })
   })
@@ -261,11 +265,19 @@ const animateMultiplayerFireflies = now => {
   const lights = []
 
   for (const target of multiplayerTargets.values()) {
+    if (!target.visible) {
+      multiplayerPositions.delete(target.seat)
+      continue
+    }
     const phase = now / 650 + (target.index * Math.PI * 2) / Math.max(count, 2)
     let position = multiplayerPositions.get(target.seat)
     if (!position) {
-      position = { x: target.x, y: target.y, points: [] }
+      position = { x: target.x, y: target.y, lineTop: target.lineTop, points: [] }
       multiplayerPositions.set(target.seat, position)
+    }
+    if (Math.abs(position.lineTop - target.lineTop) > 8) {
+      position.points = []
+      position.lineTop = target.lineTop
     }
     // Follow rapid keystrokes and line wraps with the same smooth movement;
     // only actual viewport resizing resets the path.
@@ -677,7 +689,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="w-full max-w-4xl min-h-0 flex flex-col items-center z-10 relative px-2 sm:px-8 py-3 sm:py-0 overflow-x-hidden overflow-y-auto overscroll-contain" :style="mobileViewportStyle">
+  <div class="w-full max-w-4xl min-h-0 flex flex-col items-center z-10 relative px-2 sm:px-8 py-3 sm:py-0 overflow-x-hidden overscroll-contain" :class="props.gameMode === 'multiplayer' ? 'overflow-y-hidden' : 'overflow-y-auto'" :style="mobileViewportStyle">
     
     <SplashScreen 
       v-if="isTransitioning" 
