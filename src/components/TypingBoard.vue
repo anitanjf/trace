@@ -204,8 +204,21 @@ const updateMultiplayerFireflies = async () => {
   const spans = textContainer.value.querySelectorAll('.char-span')
   if (!spans.length) return
   const areaRect = typingArea.value.getBoundingClientRect()
+  // A space is its own inline-block and can sit at a different vertical
+  // position from the letters beside it. Anchor its light to the preceding
+  // character's line so the light doesn't blink out between words.
+  const characterRects = index => {
+    const rect = spans[index].getBoundingClientRect()
+    const lineRect = poemCharacters.value[index] === ' ' && index > 0
+      ? spans[index - 1].getBoundingClientRect()
+      : rect
+    const positionRect = Math.abs(rect.top - lineRect.top) < Math.max(rect.height, lineRect.height) * .7
+      ? rect
+      : lineRect
+    return { lineRect, positionRect }
+  }
   const localIndex = Math.min(spans.length - 1, typedCount.value)
-  const localRect = spans[localIndex]?.getBoundingClientRect()
+  const localRect = characterRects(localIndex).lineRect
   const racers = props.multiplayerPlayers.filter(player => player?.seat)
   multiplayerFieldSize.value = { width: areaRect.width, height: areaRect.height }
   const activeSeats = new Set(racers.map(player => player.seat))
@@ -221,19 +234,22 @@ const updateMultiplayerFireflies = async () => {
     const progress = player.seat === props.localSeat
       ? Math.min(100, (typedCount.value / Math.max(1, poemCharacters.value.length)) * 100)
       : syncedProgress
-    const charIndex = Math.min(spans.length - 1, Math.floor((progress / 100) * (spans.length - 1)))
-    const target = spans[charIndex]
-    const rect = target.getBoundingClientRect()
-    const x = rect.left - areaRect.left + (progress >= 100 ? rect.width : rect.width / 2)
-    const y = rect.top - areaRect.top + rect.height / 2
+    // Local progress is exact; mapping its percentage back to a character
+    // rounds it to the previous letter, which fails precisely at a space.
+    const charIndex = player.seat === props.localSeat
+      ? localIndex
+      : Math.min(spans.length - 1, Math.round((progress / 100) * spans.length))
+    const { lineRect, positionRect } = characterRects(charIndex)
+    const x = positionRect.left - areaRect.left + (progress >= 100 ? positionRect.width : positionRect.width / 2)
+    const y = lineRect.top - areaRect.top + lineRect.height / 2
 
     multiplayerTargets.set(player.seat, {
       seat: player.seat,
       name: player.name,
       connected: player.connected !== false,
       x, y, index,
-      lineTop: rect.top,
-      visible: Boolean(localRect && Math.abs(rect.top - localRect.top) < Math.max(rect.height, localRect.height) * .7),
+      lineTop: lineRect.top,
+      visible: Math.abs(lineRect.top - localRect.top) < Math.max(lineRect.height, localRect.height) * .7,
       color: playerFireflyColor(player.seat)
     })
   })
