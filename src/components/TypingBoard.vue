@@ -74,9 +74,11 @@ const mobileInputRef = ref(null)
 const cursorStyle = ref({ transform: 'translate(0px, 0px)', width: '0px', height: '0px', opacity: 0 })
 const fireflyStyle = ref({ transform: 'translate(0px, 0px)', opacity: 0 })
 const multiplayerFireflies = ref([])
-const multiplayerMovingSeats = ref(new Set())
-const multiplayerProgressBySeat = new Map()
-const multiplayerMotionTimers = new Map()
+const multiplayerTargets = new Map()
+const multiplayerPositions = new Map()
+const multiplayerFieldSize = ref({ width: 0, height: 0 })
+let multiplayerFrame = null
+let lastMultiplayerFrame = 0
 const cursorAbsoluteX = ref(-1000)
 const cursorAbsoluteY = ref(-1000)
 
@@ -182,21 +184,6 @@ const playerFireflyColors = {
 
 const playerFireflyColor = seat => playerFireflyColors[seat] || '#FEF08A'
 
-const markMultiplayerFireflyMoving = seat => {
-  const movingSeats = new Set(multiplayerMovingSeats.value)
-  movingSeats.add(seat)
-  multiplayerMovingSeats.value = movingSeats
-
-  cancelScheduledTimer(multiplayerMotionTimers.get(seat))
-  const timer = schedule(() => {
-    multiplayerMotionTimers.delete(seat)
-    const settledSeats = new Set(multiplayerMovingSeats.value)
-    settledSeats.delete(seat)
-    multiplayerMovingSeats.value = settledSeats
-  }, 900)
-  multiplayerMotionTimers.set(seat, timer)
-}
-
 const updateMultiplayerFireflies = async () => {
   await nextTick()
   if (
@@ -208,6 +195,8 @@ const updateMultiplayerFireflies = async () => {
     isSweeping.value
   ) {
     multiplayerFireflies.value = []
+    multiplayerTargets.clear()
+    multiplayerPositions.clear()
     return
   }
 
@@ -215,32 +204,90 @@ const updateMultiplayerFireflies = async () => {
   if (!spans.length) return
   const areaRect = typingArea.value.getBoundingClientRect()
   const racers = props.multiplayerPlayers.filter(player => player?.seat)
-  const laneOffsets = [-18, -9, 0, 9, 18]
+  multiplayerFieldSize.value = { width: areaRect.width, height: areaRect.height }
+  const activeSeats = new Set(racers.map(player => player.seat))
+  for (const seat of multiplayerTargets.keys()) {
+    if (!activeSeats.has(seat)) {
+      multiplayerTargets.delete(seat)
+      multiplayerPositions.delete(seat)
+    }
+  }
 
-  multiplayerFireflies.value = racers.map((player, index) => {
+  racers.forEach((player, index) => {
     const syncedProgress = Math.max(0, Math.min(100, Number(player.progress) || 0))
     const progress = player.seat === props.localSeat
       ? Math.min(100, (typedCount.value / Math.max(1, poemCharacters.value.length)) * 100)
       : syncedProgress
-    const previousProgress = multiplayerProgressBySeat.get(player.seat)
-    if (previousProgress !== undefined && Math.abs(progress - previousProgress) > 0.01) {
-      markMultiplayerFireflyMoving(player.seat)
-    }
-    multiplayerProgressBySeat.set(player.seat, progress)
     const charIndex = Math.min(spans.length - 1, Math.floor((progress / 100) * (spans.length - 1)))
     const target = spans[charIndex]
     const rect = target.getBoundingClientRect()
     const x = rect.left - areaRect.left + (progress >= 100 ? rect.width : rect.width / 2)
-    const y = rect.top - areaRect.top + rect.height / 2 + laneOffsets[index % laneOffsets.length]
+    const y = rect.top - areaRect.top + rect.height / 2
 
-    return {
+    multiplayerTargets.set(player.seat, {
       seat: player.seat,
       name: player.name,
       connected: player.connected !== false,
-      transform: `translate(${x}px, ${y}px)`,
+      x, y, index,
       color: playerFireflyColor(player.seat)
-    }
+    })
   })
+}
+
+// The SVG trail is sampled from the light's real path, rather than drawn as a
+// static shape behind it. Opposite phases make nearby players cross naturally.
+const traceFireflyTrail = points => {
+  if (points.length < 2) return ''
+  const first = points[0]
+  let path = `M ${first.x.toFixed(1)} ${first.y.toFixed(1)}`
+  for (let i = 1; i < points.length - 1; i++) {
+    const current = points[i]
+    const next = points[i + 1]
+    path += ` Q ${current.x.toFixed(1)} ${current.y.toFixed(1)} ${((current.x + next.x) / 2).toFixed(1)} ${((current.y + next.y) / 2).toFixed(1)}`
+  }
+  const last = points[points.length - 1]
+  return `${path} L ${last.x.toFixed(1)} ${last.y.toFixed(1)}`
+}
+
+const animateMultiplayerFireflies = now => {
+  multiplayerFrame = requestAnimationFrame(animateMultiplayerFireflies)
+  if (props.gameMode !== 'multiplayer' || isEntering.value || isTransitioning.value || isSweeping.value) return
+  if (now - lastMultiplayerFrame < 30) return
+  const delta = lastMultiplayerFrame ? Math.min(now - lastMultiplayerFrame, 64) : 32
+  lastMultiplayerFrame = now
+  const reduced = shouldReduceMotion()
+  const count = multiplayerTargets.size
+  const lights = []
+
+  for (const target of multiplayerTargets.values()) {
+    const phase = now / 650 + (target.index * Math.PI * 2) / Math.max(count, 2)
+    let position = multiplayerPositions.get(target.seat)
+    if (!position) {
+      position = { x: target.x, y: target.y, points: [] }
+      multiplayerPositions.set(target.seat, position)
+    }
+    // Smooth progress changes without allowing a previous line to drag a tail
+    // across the whole board when the passage wraps or resizes.
+    if (Math.abs(target.x - position.x) > 160 || Math.abs(target.y - position.y) > 100) {
+      position.x = target.x
+      position.y = target.y
+      position.points = []
+    }
+    const easing = reduced ? 1 : 1 - Math.exp(-delta / 145)
+    position.x += (target.x - position.x) * easing
+    position.y += (target.y - position.y) * easing
+    const x = position.x + (reduced ? 0 : Math.sin(phase * .52) * 12)
+    const y = position.y + (reduced ? 0 : Math.sin(phase) * 19)
+    if (reduced) position.points = []
+    else {
+      position.points.push({ x, y, time: now })
+      // Roughly two seconds of flight makes the crossing curves visible.
+      position.points = position.points.filter(point => now - point.time < 2100).slice(-68)
+    }
+    const oldest = position.points[0] || { x, y }
+    lights.push({ ...target, x, y, trailStart: oldest, trail: traceFireflyTrail(position.points) })
+  }
+  multiplayerFireflies.value = lights
 }
 
 watch(typedCount, count => {
@@ -607,6 +654,7 @@ onMounted(() => {
   window.addEventListener('keydown', handleKey, { passive: false })
   window.addEventListener('resize', handleResize)
   window.visualViewport?.addEventListener('resize', handleResize)
+  if (props.gameMode === 'multiplayer') multiplayerFrame = requestAnimationFrame(animateMultiplayerFireflies)
   updateMobileViewport()
   
   const enterDelay = props.gameMode === 'flow' ? 300 : 450
@@ -622,6 +670,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (multiplayerFrame !== null) cancelAnimationFrame(multiplayerFrame)
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('resize', handleResize)
   window.visualViewport?.removeEventListener('resize', handleResize)
@@ -694,23 +743,51 @@ onBeforeUnmount(() => {
       </div>
 
       <div
+        v-if="props.gameMode === 'multiplayer' && multiplayerFireflies.length"
+        class="absolute inset-0 z-30 pointer-events-none overflow-visible"
+        aria-hidden="true"
+      >
+        <svg class="w-full h-full overflow-visible" :viewBox="`0 0 ${multiplayerFieldSize.width} ${multiplayerFieldSize.height}`" preserveAspectRatio="none">
+          <defs>
+            <linearGradient
+              v-for="player in multiplayerFireflies"
+              :id="`firefly-trail-${player.seat}`"
+              :key="player.seat"
+              gradientUnits="userSpaceOnUse"
+              :x1="player.trailStart.x"
+              :y1="player.trailStart.y"
+              :x2="player.x === player.trailStart.x && player.y === player.trailStart.y ? player.x + 1 : player.x"
+              :y2="player.y"
+            >
+              <stop offset="0%" :stop-color="player.color" stop-opacity="0" />
+              <stop offset="48%" :stop-color="player.color" stop-opacity=".18" />
+              <stop offset="100%" :stop-color="player.color" stop-opacity=".75" />
+            </linearGradient>
+          </defs>
+          <path
+            v-for="player in multiplayerFireflies"
+            :key="player.seat"
+            :d="player.trail"
+            :stroke="`url(#firefly-trail-${player.seat})`"
+            :opacity="player.connected ? 1 : .35"
+            class="multiplayer-flight-trail"
+          />
+        </svg>
+      </div>
+
+      <div
         v-for="player in multiplayerFireflies"
         :key="player.seat"
         class="absolute top-0 left-0 z-40 pointer-events-none multiplayer-firefly-glide"
-        :class="{ 'is-moving': multiplayerMovingSeats.has(player.seat) }"
         :style="{
-          transform: player.transform,
+          transform: `translate(${player.x}px, ${player.y}px)`,
           opacity: player.connected ? 1 : 0.35,
           '--multiplayer-firefly-color': player.color
         }"
         aria-hidden="true"
       >
         <span class="multiplayer-firefly-label">{{ player.seat === props.localSeat ? 'You' : player.name }}</span>
-        <span class="fireflies-container multiplayer-racer-cluster is-idle" aria-hidden="true">
-          <span class="firefly ff-1"></span>
-          <span class="firefly ff-2"></span>
-          <span class="firefly ff-3"></span>
-        </span>
+        <span class="multiplayer-racer-light"></span>
       </div>
 
       <input
@@ -797,36 +874,10 @@ onBeforeUnmount(() => {
 .mobile-capture-input:focus-visible { outline: none; }
 .cursor-glide { transition: transform 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out; }
 .firefly-glide { transition: transform 1.5s cubic-bezier(0.2, 1, 0.4, 1), opacity 0.5s ease; will-change: transform; }
-.multiplayer-firefly-glide { transition: transform .72s cubic-bezier(.2,.8,.2,1), opacity .4s ease; will-change: transform; }
-.multiplayer-firefly-label { position: absolute; left: 1.75rem; top: -.55rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .72; }
-.multiplayer-racer-cluster { color: var(--multiplayer-firefly-color); filter: drop-shadow(0 0 5px currentColor); }
-.multiplayer-racer-cluster .firefly::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 48%;
-  width: .9rem;
-  height: .62rem;
-  border-bottom: .14rem solid currentColor;
-  border-radius: 0 0 75% 35%;
-  opacity: .24;
-  filter: blur(1.5px);
-  -webkit-mask-image: linear-gradient(90deg, transparent 4%, rgba(0, 0, 0, .3) 42%, #000 100%);
-  mask-image: linear-gradient(90deg, transparent 4%, rgba(0, 0, 0, .3) 42%, #000 100%);
-  transform-origin: right center;
-  pointer-events: none;
-  animation: firefly-trail-wave 1.8s ease-in-out infinite;
-  transition: width .5s cubic-bezier(.2,.8,.2,1), height .5s ease, opacity .4s ease, filter .4s ease;
-}
-.multiplayer-racer-cluster .ff-2::after { animation-delay: -.6s; }
-.multiplayer-racer-cluster .ff-3::after { animation-delay: -1.2s; }
-.multiplayer-firefly-glide.is-moving .multiplayer-racer-cluster .firefly::after {
-  width: 2.8rem;
-  height: 1.05rem;
-  opacity: .52;
-  filter: blur(2px);
-  animation-duration: .82s;
-}
+.multiplayer-firefly-glide { will-change: transform; }
+.multiplayer-firefly-label { position: absolute; left: .7rem; top: -.7rem; white-space: nowrap; font-family: ui-sans-serif, system-ui, sans-serif; font-size: .45rem; letter-spacing: .08em; text-transform: uppercase; color: var(--multiplayer-firefly-color); opacity: .72; }
+.multiplayer-racer-light { display: block; position: absolute; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--multiplayer-firefly-color); box-shadow: 0 0 9px 3px var(--multiplayer-firefly-color), 0 0 20px 5px var(--multiplayer-firefly-color); }
+.multiplayer-flight-trail { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 4px currentColor); }
 .fireflies-container { position: absolute; width: 0; height: 0; color: var(--multiplayer-firefly-color, #fef08a); }
 .firefly { position: absolute; width: 4px; height: 4px; margin-top: -2px; margin-left: -2px; border-radius: 50%; pointer-events: none; }
 .firefly::before { content: ""; position: absolute; inset: -1px; border-radius: 50%; background: currentColor; box-shadow: 0 0 10px 3px currentColor; animation: flash 3s ease infinite alternate; }
@@ -847,18 +898,12 @@ onBeforeUnmount(() => {
 @keyframes orbit1 { 0% { transform: rotate(0deg) translateX(14px) rotate(0deg); } 100% { transform: rotate(360deg) translateX(14px) rotate(-360deg); } }
 @keyframes orbit2 { 0% { transform: rotate(45deg) translateX(20px) rotate(-45deg); } 100% { transform: rotate(405deg) translateX(20px) rotate(-405deg); } }
 @keyframes orbit3 { 0% { transform: rotate(90deg) translateX(26px) rotate(-90deg); } 100% { transform: rotate(450deg) translateX(26px) rotate(-450deg); } }
-@keyframes firefly-trail-wave {
-  0%, 100% { transform: translateY(-48%) rotate(-12deg) scaleX(.82) scaleY(.78); }
-  35% { transform: translateY(-68%) rotate(8deg) scaleX(1) scaleY(1.08); }
-  70% { transform: translateY(-30%) rotate(-3deg) scaleX(.9) scaleY(.9); }
-}
-
 @keyframes blink-cursor { 0%, 100% { opacity: 1; } 50% { opacity: 0.1; } }
 .animate-blink { animation: blink-cursor 1.2s ease-in-out infinite; }
 @keyframes ink-puff { 0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; } }
 .animate-ink-puff { animation: ink-puff 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 @media (prefers-reduced-motion: reduce) {
-  .multiplayer-firefly-glide, .firefly-glide { transition: none; }
-  .firefly::before, .fireflies-container .firefly, .multiplayer-racer-cluster .firefly::after { animation: none !important; }
+  .firefly-glide { transition: none; }
+  .firefly::before, .fireflies-container .firefly { animation: none !important; }
 }
 </style>
