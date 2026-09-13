@@ -1,13 +1,15 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 
-const [styles, app, home, settings, inkButton, settingsChoice] = await Promise.all([
+const [styles, app, home, settings, inkButton, settingsChoice, typingBoard, completionStats] = await Promise.all([
   readFile(new URL('../src/style.css', import.meta.url), 'utf8'),
   readFile(new URL('../src/App.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/Home.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/pages/Settings.vue', import.meta.url), 'utf8'),
   readFile(new URL('../src/components/ui/InkButton.vue', import.meta.url), 'utf8'),
-  readFile(new URL('../src/components/ui/SettingsChoice.vue', import.meta.url), 'utf8')
+  readFile(new URL('../src/components/ui/SettingsChoice.vue', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/TypingBoard.vue', import.meta.url), 'utf8'),
+  readFile(new URL('../src/components/CompletionStats.vue', import.meta.url), 'utf8')
 ])
 
 const requiredTokens = [
@@ -48,5 +50,9 @@ assert.doesNotMatch(home, /Explore Trace/)
 assert.doesNotMatch(home, /stats\.lifetimePassages/)
 assert.match(settings, /components\/ui\/SettingsChoice/)
 assert.match(settings, /components\/ui\/InkButton/)
+assert.match(typingBoard, /\['one', 'two', 'three'\]\.map/)
+assert.match(typingBoard, /overflow-y-auto no-scrollbar/)
+assert.match(completionStats, /ui\/InkButton/)
+assert.doesNotMatch(completionStats, /Preserved in Archive|#DFBE73/i)
 
 console.log('Trace visual token and control checks passed.')
