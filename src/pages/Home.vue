@@ -19,8 +19,8 @@ const modeDetails = {
   },
   multiplayer: {
     title: 'Quiet Multiplayer',
-    description: 'Invite one person into a private online room. You will type the same passage at your own pace while sharing only anonymous presence and progress.',
-    actionLabel: 'Open quiet room',
+    description: 'Gather two to five travelers in a private or public room. Type one shared passage and follow each light at your own pace.',
+    actionLabel: 'Open multiplayer',
     routeName: 'QuietMultiplayer'
   }
 }
@@ -99,9 +99,10 @@ const lifetimeAccuracy = computed(() => {
 
     <section class="w-full pt-6 border-t" :class="settings?.darkMode ? 'border-stone-800' : 'border-stone-300'" aria-labelledby="explore-heading">
       <h2 id="explore-heading" class="text-[9px] uppercase tracking-[0.3em] opacity-55 text-center mb-4 font-ui-sans">Explore Trace</h2>
-      <nav aria-label="Account and information" class="grid grid-cols-2 sm:grid-cols-4 gap-2 font-ui-sans">
+      <nav aria-label="Account and information" class="grid grid-cols-2 sm:grid-cols-5 gap-2 font-ui-sans">
         <InkButton variant="ghost" block compact @click="router.push('/profile')" class="text-[10px] uppercase tracking-[0.16em]">Profile</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/archive')" class="text-[10px] uppercase tracking-[0.16em]">Archive</InkButton>
+        <InkButton variant="soft" block compact @click="router.push('/leaderboards')" class="col-span-2 sm:col-span-1 text-[10px] uppercase tracking-[0.16em]">Leaderboards</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/settings')" class="text-[10px] uppercase tracking-[0.16em]">Preferences</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/about')" class="text-[10px] uppercase tracking-[0.16em]">About</InkButton>
       </nav>
