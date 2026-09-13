@@ -8,6 +8,7 @@ import About from '../pages/About.vue'
 import Profile from '../pages/Profile.vue'
 import Flow from '../pages/Flow.vue'
 import QuietMultiplayer from '../pages/QuietMultiplayer.vue'
+import Leaderboard from '../pages/Leaderboard.vue'
 import { applyRouteMetadata } from '../utils/metadata'
 
 const routes = [
@@ -19,7 +20,8 @@ const routes = [
   { path: '/about', name: 'About', component: About },
   { path: '/profile', name: 'Profile', component: Profile },
   { path: '/flow', name: 'Flow', component: Flow },
-  { path: '/multiplayer', name: 'QuietMultiplayer', component: QuietMultiplayer }
+  { path: '/multiplayer', name: 'QuietMultiplayer', component: QuietMultiplayer },
+  { path: '/leaderboards', name: 'Leaderboards', component: Leaderboard }
 ]
 
 const router = createRouter({

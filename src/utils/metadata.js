@@ -19,7 +19,11 @@ const routeMetadata = {
   },
   QuietMultiplayer: {
     title: 'Quiet Multiplayer — Trace',
-    description: 'Invite one person into a private, non-competitive online typing room without sharing typed text.'
+    description: 'Gather two to five travelers for a shared, gently competitive typing passage.'
+  },
+  Leaderboards: {
+    title: 'Multiplayer Leaderboards — Trace',
+    description: 'See the fastest qualifying shared passages at 50, 100, and 200 words, with every traveler kept anonymous.'
   },
   Archive: {
     title: 'Archive — Trace',
@@ -35,7 +39,7 @@ const routeMetadata = {
   },
   Profile: {
     title: 'Profile — Trace',
-    description: 'Review your private Trace journey, seasonal progress, and earned enlightenments.'
+    description: 'Review your meditation practice, multiplayer results, and earned enlightenments.'
   }
 }
 

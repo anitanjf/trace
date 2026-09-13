@@ -12,7 +12,7 @@ Players choose Short Breath (50 words), Steady Breath (100 words), or Deep Exhal
 
 ## Race language
 
-The numeric progress bars were removed. Each participant is represented by a distinct colored firefly moving toward dawn. Finishing order appears only after all remaining players finish. Typed words, WPM, accuracy, and mistakes never leave the player's browser.
+The numeric progress bars were removed. Each participant is represented by a distinct colored firefly moving toward dawn. Finishing order appears only after all remaining players finish. The room shares progress and match metrics (WPM, accuracy, elapsed time and mistakes), but not the typed passage input itself.
 
 ## Lifecycle
 
@@ -23,3 +23,9 @@ An active match ends with an ink-mark message when fewer than two connected trav
 ## Firebase
 
 Publish database.rules.json under Realtime Database → Rules. These are not Firestore rules. The rules use five fixed seats and do not use numChildren().
+
+## Leaderboards
+
+The home menu links to three boards: 50, 100 and 200 words. Each signed-in traveler can place one personal best per length; only completed rooms with at least 90% accuracy qualify. The board ranks recorded WPM, breaking ties by accuracy and time. Public board entries include only a room reference, seat, score and timestamp; the UI creates a stable anonymous trail name from the Firebase UID without reading the player's private profile. Only authenticated users can read the top 100 entries per length. No existing match can be backfilled after its room expires.
+
+The new `multiplayerLeaderboard` section in `database.rules.json` must be published to **Realtime Database → Rules** before new entries can be submitted. The rules restrict entries to the player's own best result from an ended room and index WPM. As the underlying match timing and keystrokes are still written by the clients, this is not an anti-cheat system; a trusted server would be necessary for authoritative competitive rankings.
