@@ -17,6 +17,7 @@ const getDefaultStats = () => ({
   activityGrid: {}, 
   passageHistory: {},
   sessionLedger: {}, 
+  multiplayerMatches: {},
   // NEW: Silent Enlightenment System Tracker
   achievements: {
     firstStep: { unlocked: false, timestamp: null },
@@ -209,6 +210,7 @@ const mergeProgress = (remoteStats = {}, localStats = {}) => {
     .sort()
     .at(-1) || null
   merged.passageHistory = { ...(remoteStats.passageHistory || {}), ...(localStats.passageHistory || {}) }
+  merged.multiplayerMatches = { ...(remoteStats.multiplayerMatches || {}), ...(localStats.multiplayerMatches || {}) }
   merged.achievements = { ...getDefaultStats().achievements, ...(remoteStats.achievements || {}) }
   for (const [key, value] of Object.entries(localStats.achievements || {})) {
     if (value?.unlocked && !merged.achievements[key]?.unlocked) merged.achievements[key] = value
@@ -317,6 +319,28 @@ export const savePassageHistory = (passageId, attemptsArray) => {
   if (!stats.value.passageHistory) stats.value.passageHistory = {}
   stats.value.passageHistory[passageId] = attemptsArray
   scheduleProgressSync()
+}
+
+// Match summaries belong to the player, never to the public room. A room code
+// identifies the result across tabs/devices without storing opponents' names.
+export const recordMultiplayerMatch = (match = {}) => {
+  if (!currentUser.value || !match.roomCode || ![50, 100, 200].includes(Number(match.wordCount))) return false
+  stats.value.multiplayerMatches ||= {}
+  if (stats.value.multiplayerMatches[match.roomCode]) return false
+  stats.value.multiplayerMatches[match.roomCode] = {
+    wordCount: Number(match.wordCount),
+    playedAt: Number(match.playedAt) || Date.now(),
+    placement: Math.max(1, Number(match.placement) || 1),
+    players: Math.max(2, Number(match.players) || 2),
+    finished: Boolean(match.finished),
+    won: Boolean(match.won),
+    dnf: Boolean(match.dnf),
+    wpm: Math.max(0, Number(match.wpm) || 0),
+    accuracy: Math.max(0, Math.min(100, Number(match.accuracy) || 0)),
+    elapsedMs: Math.max(0, Number(match.elapsedMs) || 0)
+  }
+  scheduleProgressSync()
+  return true
 }
 
 // NEW: Evaluates achievements silently at the end of a passage

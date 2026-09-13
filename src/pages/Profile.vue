@@ -6,12 +6,18 @@ import { logOut, db } from '../services/firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import AuthModal from '../components/AuthModal.vue'
 import Heatmap from '../components/Heatmap.vue'
-import { seasons, seasonInkPalette } from '../utils/constants'
+import { seasonInkPalette } from '../utils/constants'
 import { getRealWorldSeason } from '../utils/helpers'
 
 const router = useRouter()
 const showAuthModal = ref(false)
-const activeTab = ref(getRealWorldSeason())
+const activeTab = ref('meditation')
+const profileTabs = [
+  { id: 'meditation', label: 'Meditation' },
+  { id: 50, label: '50 words' },
+  { id: 100, label: '100 words' },
+  { id: 200, label: '200 words' }
+]
 const themeSeasonIndex = computed(() =>
   settings.value.themeMode === 'locked'
     ? Number(settings.value.lockedSeason || 0)
@@ -111,20 +117,13 @@ const handleLogout = async () => {
   catch (err) { console.error(err) }
 }
 
-const getSeasonAccuracy = (sIdx) => {
-  const s = stats.value.seasonal[sIdx]
-  if (!s || s.keystrokes === 0) return 100
-  const correct = s.keystrokes - s.mistakes
-  return Math.max(0, Math.round((correct / s.keystrokes) * 100))
-}
-
-const seasonalPassageHistory = computed(() => {
+const meditationPassageHistory = computed(() => {
   if (!stats.value.passageHistory) return []
-  const prefix = `season_${activeTab.value}_`
-  
+
   return Object.entries(stats.value.passageHistory)
-    .filter(([key]) => key.startsWith(prefix))
+    .filter(([key]) => key.startsWith('season_'))
     .map(([key, attempts]) => {
+      if (!Array.isArray(attempts) || !attempts.length) return null
       const passageNumber = key.split('_passage_')[1]
       const isFlow = key.includes('_flow_')
       const latestAttempt = attempts[attempts.length - 1]
@@ -132,49 +131,59 @@ const seasonalPassageHistory = computed(() => {
       return {
         id: key,
         number: passageNumber || wordCount || 'Flow',
-        label: isFlow ? `Flow · ${wordCount} words` : `Passage ${passageNumber}`,
+        label: isFlow ? `Flow · ${wordCount} words` : `Passage ${passageNumber || '—'}`,
         mode: isFlow ? 'flow' : (latestAttempt?.mode || 'meditation'),
         attempts,
         completedAt: latestAttempt?.completedAt || 0
       }
-    })
+    }).filter(Boolean)
     .sort((a, b) =>
       b.completedAt - a.completedAt ||
       (Number.parseInt(b.number, 10) || 0) - (Number.parseInt(a.number, 10) || 0)
     ) 
 })
 
+const multiplayerHistory = computed(() => Object.entries(stats.value.multiplayerMatches || {})
+  .filter(([, match]) => Number(match?.wordCount) === activeTab.value)
+  .map(([id, match]) => ({ id, ...match }))
+  .sort((a, b) => b.playedAt - a.playedAt))
+
+const multiplayerSummary = computed(() => {
+  const matches = multiplayerHistory.value
+  const finished = matches.filter(match => match.finished)
+  const withTyping = matches.filter(match => match.wpm > 0)
+  return {
+    played: matches.length,
+    wins: matches.filter(match => match.won).length,
+    finishRate: matches.length ? Math.round(finished.length / matches.length * 100) : 0,
+    wpm: withTyping.length ? Math.round(withTyping.reduce((sum, match) => sum + match.wpm, 0) / withTyping.length) : 0,
+    accuracy: withTyping.length ? Math.round(withTyping.reduce((sum, match) => sum + match.accuracy, 0) / withTyping.length) : 0
+  }
+})
+
+const meditationSummary = computed(() => {
+  const attempts = meditationPassageHistory.value.flatMap(passage => passage.attempts)
+  const withTyping = attempts.filter(attempt => Number(attempt.keystrokes) > 0 || Number(attempt.wpm) > 0)
+  return {
+    passages: Math.max(meditationPassageHistory.value.length, Number(stats.value.lifetimePassages) || 0),
+    reflections: attempts.length,
+    accuracy: withTyping.length ? Math.round(withTyping.reduce((sum, attempt) => sum + (Number(attempt.accuracy) || 0), 0) / withTyping.length) : 0,
+    wpm: withTyping.length ? Math.round(withTyping.reduce((sum, attempt) => sum + (Number(attempt.wpm) || 0), 0) / withTyping.length) : 0
+  }
+})
+
 const filteredPassages = computed(() => {
   if (!searchQuery.value.trim()) return [] 
   const query = searchQuery.value.trim().toLowerCase()
-  return seasonalPassageHistory.value.filter(p =>
+  return meditationPassageHistory.value.filter(p =>
     p.number.toString().toLowerCase().includes(query) ||
     p.label.toLowerCase().includes(query) ||
     p.mode.includes(query)
   )
 })
 
-const getSeasonAverages = computed(() => {
-  let totalWPM = 0
-  let totalReflections = 0
-  let passagesCount = seasonalPassageHistory.value.length
-
-  if (passagesCount === 0) return { wpm: 0, reflections: 0 }
-
-  seasonalPassageHistory.value.forEach(p => {
-    totalReflections += p.attempts.length
-    const finalAttempt = p.attempts[p.attempts.length - 1]
-    if (finalAttempt && finalAttempt.wpm) totalWPM += finalAttempt.wpm
-  })
-
-  return {
-    wpm: Math.round(totalWPM / passagesCount),
-    reflections: totalReflections
-  }
-})
-
 const radarData = computed(() => {
-  const history = seasonalPassageHistory.value
+  const history = meditationPassageHistory.value
   const passagesCount = history.length
 
   if (passagesCount === 0) return { polygon: "100,90 108,95 108,105 100,110 92,105 92,95", points: [] }
@@ -237,9 +246,10 @@ const radarData = computed(() => {
 <template>
   <div class="z-10 flex flex-col w-full max-w-6xl mx-auto min-h-screen pt-12 md:pt-20 px-4 sm:px-12 pb-16 font-ui-sans relative overflow-x-hidden no-scrollbar">
     
-    <h2 class="text-2xl sm:text-3xl tracking-[0.3em] uppercase font-light mb-8 md:mb-12 flex-shrink-0 font-ui-serif w-full text-center md:text-left" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
-      Traces of the Mind
-    </h2>
+    <div class="mb-8 md:mb-12 w-full text-center md:text-left">
+      <p class="text-[9px] uppercase tracking-[0.32em] opacity-55 mb-3">Your practice, in every season</p>
+      <h2 class="text-2xl sm:text-3xl tracking-[0.25em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">Traces of the Mind</h2>
+    </div>
 
     <template v-if="currentUser">
       <div class="flex flex-col md:grid md:grid-cols-[16rem_1fr] gap-y-12 md:gap-y-8 gap-x-12 md:gap-x-16 w-full items-center md:items-start">
@@ -253,11 +263,11 @@ const radarData = computed(() => {
           
           <div class="flex flex-col gap-1 w-full items-center px-2 md:px-0">
             <h1 class="text-xl tracking-widest font-ui-serif px-4 md:px-0" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-900'">
-              {{ customProfile.isAnonymous ? (customProfile.alias || 'A Wandering Soul') : (currentUser.displayName || 'Jhonnel Fernandez Anitan') }}
+              {{ customProfile.isAnonymous ? (customProfile.alias || 'A Wandering Soul') : (currentUser.displayName || 'A Wandering Soul') }}
             </h1>
             
             <h2 v-if="!customProfile.isAnonymous" class="text-[9px] uppercase tracking-[0.2em] opacity-70 mb-6 font-semibold truncate w-full px-4" :class="settings.darkMode ? 'text-stone-400' : 'text-stone-600'">
-              {{ currentUser.email || 'anitanjhonnel@gmail.com' }}
+              {{ currentUser.email || '' }}
             </h2>
             <div v-else class="text-[9px] uppercase tracking-[0.2em] opacity-50 mb-6 italic" :class="settings.darkMode ? 'text-stone-500' : 'text-stone-400'">
               Hidden Identity
@@ -318,20 +328,50 @@ const radarData = computed(() => {
 
           <div class="w-full flex flex-col items-center md:items-start mt-4">
             
-            <div class="w-full flex flex-wrap justify-center md:justify-start gap-2 sm:gap-4 mb-6 md:mb-12 border-b pb-4" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'">
-              <button v-for="(season, index) in seasons" :key="index" @click="activeTab = index; searchQuery = ''" class="relative px-4 sm:px-5 py-2.5 text-[8px] sm:text-[9px] tracking-[0.25em] uppercase transition-all duration-300 group" :class="activeTab === index ? (settings.darkMode ? 'text-stone-100 font-semibold' : 'text-stone-900 font-semibold') : (settings.darkMode ? 'text-stone-400 hover:text-stone-200' : 'text-stone-700 hover:text-stone-900')">
-                <div v-if="activeTab === index" class="absolute inset-0 rounded-sm pointer-events-none z-[-1] transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.72]' : 'opacity-[0.62]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></div>
-                <div v-if="activeTab !== index" class="absolute inset-0 rounded-sm pointer-events-none z-[-1] opacity-0 group-hover:opacity-[0.05] transition-opacity duration-300" :class="settings.darkMode ? 'bg-white' : 'bg-stone-800'" style="filter: url(#ink-blot);"></div>
-                {{ season.name }}
+            <div class="w-full flex flex-wrap justify-center md:justify-start gap-2 sm:gap-4 mb-6 md:mb-10 border-b pb-5" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'" role="tablist" aria-label="Practice statistics">
+              <button v-for="tab in profileTabs" :key="tab.id" type="button" role="tab" :aria-selected="activeTab === tab.id" @click="activeTab = tab.id; searchQuery = ''; expandedPassageId = null" class="relative isolate px-4 sm:px-5 py-3 min-h-11 text-[9px] tracking-[0.18em] uppercase transition-all duration-300 group" :class="activeTab === tab.id ? 'font-semibold' : 'opacity-55 hover:opacity-90'">
+                <span v-if="activeTab === tab.id" aria-hidden="true" class="absolute inset-0 -z-10 rounded-sm pointer-events-none transition-[background-color,opacity] duration-700" :class="settings.darkMode ? 'opacity-[0.5]' : 'opacity-[0.35]'" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></span>
+                {{ tab.label }}
               </button>
             </div>
 
+            <div v-if="activeTab !== 'meditation'" class="w-full space-y-7" role="tabpanel">
+              <div class="max-w-2xl">
+                <p class="text-[9px] uppercase tracking-[0.28em] opacity-55 mb-3">Shared passages · {{ activeTab }} words</p>
+                <h3 class="font-ui-serif text-xl sm:text-2xl leading-relaxed">Each light finds its own pace.</h3>
+                <p class="text-xs leading-relaxed opacity-60 mt-2">Your results from completed multiplayer rooms, wherever the seasons led you.</p>
+              </div>
+              <div class="relative isolate p-6 sm:p-8">
+                <span aria-hidden="true" class="absolute inset-0 -z-10 opacity-[0.13]" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></span>
+                <dl class="grid grid-cols-2 sm:grid-cols-3 gap-x-5 gap-y-7 text-center">
+                  <div v-for="metric in [
+                    ['Matches', multiplayerSummary.played], ['Wins', multiplayerSummary.wins], ['Finished', multiplayerSummary.finishRate + '%'],
+                    ['Avg pace', multiplayerSummary.wpm + ' WPM'], ['Avg clarity', multiplayerSummary.accuracy + '%']
+                  ]" :key="metric[0]" class="space-y-2">
+                    <dt class="text-[9px] uppercase tracking-[0.17em] opacity-55">{{ metric[0] }}</dt>
+                    <dd class="font-ui-serif text-xl tabular-nums">{{ metric[1] }}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div>
+                <h3 class="text-[9px] uppercase tracking-[0.25em] opacity-60 mb-4">Recent matches</h3>
+                <p v-if="!multiplayerHistory.length" class="py-8 text-sm leading-relaxed opacity-65">No {{ activeTab }}-word matches recorded yet. Your next shared passage will leave a trace here.</p>
+                <ol v-else class="space-y-3">
+                  <li v-for="match in multiplayerHistory.slice(0, 12)" :key="match.id" class="relative isolate flex flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs">
+                    <span aria-hidden="true" class="absolute inset-0 -z-10 opacity-[0.09]" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></span>
+                    <span class="flex flex-col gap-1"><strong class="font-ui-serif font-normal text-base">{{ match.dnf ? 'Did not finish' : match.won ? 'First light' : match.finished ? 'Passage complete' : 'Last light standing' }}</strong><time class="opacity-55 text-[10px]" :datetime="new Date(match.playedAt).toISOString()">{{ new Date(match.playedAt).toLocaleDateString() }}</time></span>
+                    <span class="text-right tabular-nums">{{ match.placement }} / {{ match.players }} · {{ match.wpm }} WPM · {{ match.accuracy }}%</span>
+                  </li>
+                </ol>
+              </div>
+            </div>
+
             <!-- LAYOUT: 1/3 Chart, 2/3 Search & Stats -->
-            <div class="flex flex-col lg:flex-row w-full gap-16 lg:gap-12 items-start mt-2">
+            <div v-else class="flex flex-col lg:flex-row w-full gap-12 lg:gap-12 items-start mt-2" role="tabpanel">
               
               <!-- LEFT (1/3): RADAR CHART -->
               <div class="w-full lg:w-1/3 flex flex-col items-center pt-2 relative">
-                 <span class="text-[8px] sm:text-[9px] uppercase tracking-[0.4em] opacity-40 font-semibold mb-8 text-center">Path to Mastery</span>
+                 <span class="text-[8px] sm:text-[9px] uppercase tracking-[0.4em] opacity-60 font-semibold mb-8 text-center">Meditation · Path to Mastery</span>
                  
                  <div class="relative w-28 h-28 sm:w-36 sm:h-36 mb-2 mt-2">
                     <svg viewBox="0 0 200 200" class="w-full h-full overflow-visible pointer-events-none">
@@ -377,7 +417,7 @@ const radarData = computed(() => {
                  <!-- SEARCH BAR -->
                  <div class="w-full border-b pb-3 mb-4 flex items-center gap-3 transition-colors duration-300" :class="settings.darkMode ? 'border-stone-800 focus-within:border-stone-500' : 'border-stone-300 focus-within:border-stone-500'">
                     <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
-                    <input v-model="searchQuery" type="text" placeholder="Search a passage number..." class="w-full bg-transparent text-xs tracking-widest uppercase focus:outline-none placeholder:opacity-30 font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
+                    <input v-model="searchQuery" type="search" aria-label="Search meditation passages" placeholder="Search meditation passages..." class="w-full bg-transparent text-xs tracking-widest uppercase focus:outline-none placeholder:opacity-50 font-ui-sans" :class="settings.darkMode ? 'text-stone-200' : 'text-stone-800'">
                  </div>
 
                  <!-- OVERALL STATS CONTAINER -->
@@ -387,19 +427,19 @@ const radarData = computed(() => {
                    <div class="grid grid-cols-2 md:grid-cols-4 gap-y-6 gap-x-4 relative z-10 text-center">
                      <div class="flex flex-col gap-1.5">
                        <span class="text-[6px] sm:text-[7px] uppercase tracking-[0.3em] opacity-50 font-ui-sans font-semibold">Passages</span>
-                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ stats.seasonal[activeTab].passages }}</span>
+                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ meditationSummary.passages }}</span>
                      </div>
                      <div class="flex flex-col gap-1.5">
                        <span class="text-[6px] sm:text-[7px] uppercase tracking-[0.3em] opacity-50 font-ui-sans font-semibold">Avg Clarity</span>
-                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ getSeasonAccuracy(activeTab) }}%</span>
+                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ meditationSummary.accuracy }}%</span>
                      </div>
                      <div class="flex flex-col gap-1.5">
                        <span class="text-[6px] sm:text-[7px] uppercase tracking-[0.3em] opacity-50 font-ui-sans font-semibold">Avg Speed</span>
-                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ getSeasonAverages.wpm }} <span class="text-[7px] opacity-40 font-ui-sans">WPM</span></span>
+                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ meditationSummary.wpm }} <span class="text-[7px] opacity-40 font-ui-sans">WPM</span></span>
                      </div>
                      <div class="flex flex-col gap-1.5">
                        <span class="text-[6px] sm:text-[7px] uppercase tracking-[0.3em] opacity-50 font-ui-sans font-semibold">Reflections</span>
-                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ getSeasonAverages.reflections }}</span>
+                       <span class="text-lg sm:text-xl font-light font-ui-serif">{{ meditationSummary.reflections }}</span>
                      </div>
                    </div>
 
