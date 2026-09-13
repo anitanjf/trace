@@ -97,9 +97,11 @@ const handleModeAction = async () => {
       <nav aria-label="Profile, leaderboards, and information" class="grid grid-cols-2 sm:grid-cols-5 gap-2 font-ui-sans">
         <InkButton variant="ghost" block compact @click="router.push('/profile')" class="text-[10px] uppercase tracking-[0.16em]">Profile</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/archive')" class="text-[10px] uppercase tracking-[0.16em]">Archive</InkButton>
-        <InkButton variant="soft" block compact @click="router.push('/leaderboards')" class="col-span-2 sm:col-span-1 text-[10px] uppercase tracking-[0.16em]">Leaderboards</InkButton>
+        <InkButton variant="ghost" block compact @click="router.push('/leaderboards')" class="text-[10px] uppercase tracking-[0.16em]">Leaderboards</InkButton>
         <InkButton variant="ghost" block compact @click="router.push('/settings')" class="text-[10px] uppercase tracking-[0.16em]">Preferences</InkButton>
-        <InkButton variant="ghost" block compact @click="router.push('/about')" class="text-[10px] uppercase tracking-[0.16em]">About</InkButton>
+        <span class="col-span-2 sm:col-span-1 w-[calc(50%_-_0.25rem)] sm:w-full justify-self-center">
+          <InkButton variant="ghost" block compact @click="router.push('/about')" class="text-[10px] uppercase tracking-[0.16em]">About</InkButton>
+        </span>
       </nav>
     </section>
 
