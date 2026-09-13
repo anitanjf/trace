@@ -2,6 +2,10 @@
 import { settings } from '../store'
 
 defineProps({
+  compact: {
+    type: Boolean,
+    default: false
+  },
   text: {
     type: String,
     default: 'Gathering thoughts...'
@@ -10,33 +14,29 @@ defineProps({
 </script>
 
 <template>
-  <div class="flex flex-col items-center animate-fade-in z-20">
-    <div class="relative w-40 h-40 mb-2 flex flex-col items-center justify-center">
+  <div class="flex flex-col items-center animate-fade-in z-20" :class="{ 'zen-loader--compact': compact }">
+    <div class="relative flex flex-col items-center justify-center" :class="compact ? 'w-20 h-20' : 'w-40 h-40 mb-2'">
       
       <!-- Floating Spirit Container -->
       <div class="relative z-10 animate-float flex items-center justify-center">
         
         <!-- Organic Ink Thought Trail -->
-        <div class="absolute -top-23 -right-23 w-28 h-28 z-30 pointer-events-none">
+        <div class="absolute z-30 pointer-events-none" :class="compact ? '-top-8 -right-8 w-12 h-12' : '-top-23 -right-23 w-28 h-28'">
           <!-- Small ink mark -->
-          <div class="absolute bottom-4 left-4 w-1.5 h-1.5 rounded-full animate-thought-pop-1 transition-colors duration-1000" 
-               :class="settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80'" 
+          <div class="absolute rounded-full animate-thought-pop-1 transition-colors duration-1000" :class="[compact ? 'bottom-2 left-1 w-1 h-1' : 'bottom-4 left-4 w-1.5 h-1.5', settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80']"
                style="filter: url(#ink-blot);"></div>
                
           <!-- Slightly bigger ink mark -->
-          <div class="absolute bottom-6 left-6 w-4 h-4 rounded-full animate-thought-pop-2 transition-colors duration-1000" 
-               :class="settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80'" 
+          <div class="absolute rounded-full animate-thought-pop-2 transition-colors duration-1000" :class="[compact ? 'bottom-4 left-3 w-2 h-2' : 'bottom-6 left-6 w-4 h-4', settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80']"
                style="filter: url(#ink-blot);"></div>
                
           <!-- Big ink cloud -->
-          <div class="absolute bottom-10 left-10 w-12 h-8 rounded-[40%] animate-thought-pop-3 transition-colors duration-1000" 
-               :class="settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80'" 
+          <div class="absolute rounded-[40%] animate-thought-pop-3 transition-colors duration-1000" :class="[compact ? 'bottom-6 left-5 w-5 h-3' : 'bottom-10 left-10 w-12 h-8', settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80']"
                style="filter: url(#ink-blot);"></div>
         </div>
 
         <!-- Breathing Ink Body -->
-        <div class="w-14 h-14 rounded-full transition-colors duration-1000 animate-zen-breathe"
-             :class="settings?.darkMode ? 'bg-stone-300' : 'bg-stone-800'"
+        <div class="rounded-full transition-colors duration-1000 animate-zen-breathe" :class="[compact ? 'w-10 h-10' : 'w-14 h-14', settings?.darkMode ? 'bg-stone-300' : 'bg-stone-800']"
              style="filter: url(#ink-blot);"></div>
              
         <!-- Meditating Eyes -->
@@ -51,11 +51,10 @@ defineProps({
       </div>
       
       <!-- Ground Shadow -->
-      <div class="absolute bottom-6 w-12 h-1.5 rounded-[50%] blur-[3px] animate-shadow-pulse transition-colors duration-1000"
-           :class="settings?.darkMode ? 'bg-black/80' : 'bg-stone-400/60'"></div>
+      <div class="absolute rounded-[50%] blur-[3px] animate-shadow-pulse transition-colors duration-1000" :class="[compact ? 'bottom-2 w-8 h-1' : 'bottom-6 w-12 h-1.5', settings?.darkMode ? 'bg-black/80' : 'bg-stone-400/60']"></div>
     </div>
     
-    <p class="italic text-[10px] tracking-widest uppercase font-ui-sans animate-pulse-slow transition-colors duration-1000" 
+    <p v-if="text" class="italic text-[10px] tracking-widest uppercase font-ui-sans animate-pulse-slow transition-colors duration-1000"
        :class="settings?.darkMode ? 'text-stone-300 opacity-70' : 'text-stone-500'">
       {{ text }}
     </p>
@@ -65,6 +64,8 @@ defineProps({
 <style scoped>
 @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-8px); } }
 .animate-float { animation: float 4s ease-in-out infinite; }
+@keyframes float-home { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+.zen-loader--compact .animate-float { animation: float-home 5.5s ease-in-out infinite; }
 
 @keyframes zen-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
 .animate-zen-breathe { animation: zen-breathe 4s ease-in-out infinite; }
