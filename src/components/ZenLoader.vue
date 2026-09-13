@@ -6,6 +6,10 @@ defineProps({
     type: Boolean,
     default: false
   },
+  showThought: {
+    type: Boolean,
+    default: true
+  },
   text: {
     type: String,
     default: 'Gathering thoughts...'
@@ -21,7 +25,7 @@ defineProps({
       <div class="relative z-10 animate-float flex items-center justify-center">
         
         <!-- Organic Ink Thought Trail -->
-        <div class="absolute z-30 pointer-events-none" :class="compact ? '-top-8 -right-8 w-12 h-12' : '-top-23 -right-23 w-28 h-28'">
+        <div v-if="showThought" class="absolute z-30 pointer-events-none" :class="compact ? '-top-8 -right-8 w-12 h-12' : '-top-23 -right-23 w-28 h-28'">
           <!-- Small ink mark -->
           <div class="absolute rounded-full animate-thought-pop-1 transition-colors duration-1000" :class="[compact ? 'bottom-2 left-1 w-1 h-1' : 'bottom-4 left-4 w-1.5 h-1.5', settings?.darkMode ? 'bg-stone-300 opacity-90' : 'bg-stone-800 opacity-80']"
                style="filter: url(#ink-blot);"></div>

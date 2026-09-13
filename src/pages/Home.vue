@@ -5,7 +5,6 @@ import { settings } from '../store'
 import ComingSoonModal from '../components/ComingSoonModal.vue'
 import InkButton from '../components/ui/InkButton.vue'
 import InkInfoButton from '../components/ui/InkInfoButton.vue'
-import ZenLoader from '../components/ZenLoader.vue'
 
 const router = useRouter()
 const activeModeInfo = ref(null)
@@ -44,7 +43,6 @@ const handleModeAction = async () => {
     <header class="text-center">
       <h1 class="text-5xl sm:text-7xl tracking-[0.35em] uppercase leading-none font-bold" :class="settings?.darkMode ? 'text-stone-100' : 'text-stone-900'">TRACE</h1>
       <p class="mt-3 text-[10px] sm:text-xs uppercase tracking-[0.3em] opacity-70 font-ui-sans">A little stillness in every word</p>
-      <div class="mt-2 flex justify-center" aria-hidden="true"><ZenLoader compact text="" /></div>
     </header>
 
     <section class="w-full space-y-4" aria-labelledby="practice-heading">
@@ -68,29 +66,29 @@ const handleModeAction = async () => {
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div class="relative isolate min-h-24 p-4 sm:p-5 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.36] group-hover:opacity-[0.46]' : 'opacity-[0.28] group-hover:opacity-[0.38]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.2deg)' }"></div>
-          <button @click="router.push('/daily')" class="relative z-10 min-h-16 w-full pr-9 text-left flex flex-col justify-center gap-1">
-            <span class="text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</span>
-            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Return to a moment of stillness.</span>
-          </button>
-          <InkInfoButton label="About Daily Reflection" @click="openModeInfo('daily')" />
+          <div class="relative z-10 flex items-center gap-1">
+            <button @click="router.push('/daily')" class="min-h-11 text-left text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Daily Reflection</button>
+            <InkInfoButton label="About Daily Reflection" @click="openModeInfo('daily')" />
+          </div>
+          <p class="relative z-10 text-[10px] leading-relaxed opacity-65 font-ui-sans">Return to a moment of stillness.</p>
         </div>
 
         <div class="relative isolate min-h-24 p-4 sm:p-5 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.36] group-hover:opacity-[0.46]' : 'opacity-[0.28] group-hover:opacity-[0.38]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(-0.2deg)' }"></div>
-          <button @click="router.push('/flow')" class="relative z-10 min-h-16 w-full pr-9 text-left flex flex-col justify-center gap-1">
-            <span class="text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</span>
-            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Let the words carry you.</span>
-          </button>
-          <InkInfoButton label="About Flow State" @click="openModeInfo('flow')" />
+          <div class="relative z-10 flex items-center gap-1">
+            <button @click="router.push('/flow')" class="min-h-11 text-left text-xs sm:text-sm tracking-[0.12em] sm:tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Flow State</button>
+            <InkInfoButton label="About Flow State" @click="openModeInfo('flow')" />
+          </div>
+          <p class="relative z-10 text-[10px] leading-relaxed opacity-65 font-ui-sans">Let the words carry you.</p>
         </div>
 
         <div class="relative isolate min-h-20 p-4 sm:p-5 sm:col-span-2 group">
           <div class="absolute inset-0 -z-10 rounded-xl transition-[background-color,opacity] duration-700" :class="settings?.darkMode ? 'opacity-[0.26] group-hover:opacity-[0.36]' : 'opacity-[0.20] group-hover:opacity-[0.30]'" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)', transform: 'rotate(0.1deg) scaleX(1.002)' }"></div>
-          <button @click="openModeInfo('multiplayer')" class="relative z-10 min-h-14 w-full pr-10 flex flex-col justify-center gap-1 text-left">
-            <span class="text-xs sm:text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</span>
-            <span class="text-[10px] leading-relaxed opacity-65 font-ui-sans">Follow your light beside others.</span>
-          </button>
-          <InkInfoButton label="About Multiplayer" @click="openModeInfo('multiplayer')" />
+          <div class="relative z-10 flex items-center gap-1">
+            <button @click="openModeInfo('multiplayer')" class="min-h-11 text-left text-xs sm:text-sm tracking-[0.2em] uppercase font-ui-serif" :class="settings?.darkMode ? 'text-stone-200' : 'text-stone-900'">Multiplayer</button>
+            <InkInfoButton label="About Multiplayer" @click="openModeInfo('multiplayer')" />
+          </div>
+          <p class="relative z-10 text-[10px] leading-relaxed opacity-65 font-ui-sans">Follow your light beside others.</p>
         </div>
       </div>
     </section>
