@@ -25,21 +25,22 @@ const activeSeasonInk = computed(() => {
 
 const principles = [
   {
-    title: 'No pressure',
-    text: 'No countdowns, rankings, or failure states—only room to begin again.'
+    title: 'Begin gently',
+    text: 'Meditation and daily reflection give each word room to arrive at its own pace.'
   },
   {
-    title: 'A gentler rhythm',
-    text: 'Seasonal passages, quiet sound, and considered motion help attention settle.'
+    title: 'Stay in your flow',
+    text: 'Choose a longer passage, follow the seasons, and find a rhythm that feels like yours.'
   },
   {
-    title: 'Progress with meaning',
-    text: 'Your traces preserve growth without turning reflection into a competition.'
+    title: 'Travel together',
+    text: 'In multiplayer, two to five lights share a passage. The race is real; the invitation to breathe remains.'
   }
 ]
 
 const creatorLinks = [
   { label: 'GitHub', detail: '@anitanjf', href: 'https://github.com/anitanjf' },
+  { label: 'LinkedIn', detail: 'Jhonnel Anitan', href: 'https://www.linkedin.com/in/jhonnelanitan2022/' },
   { label: 'Trace source', detail: 'View the repository', href: 'https://github.com/anitanjf/trace' }
 ]
 
@@ -80,11 +81,11 @@ const supportMessage = {
           :class="settings.darkMode ? 'opacity-[0.72]' : 'opacity-[0.62]'"
           :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)', transform: 'rotate(-0.08deg) scale(0.995)' }"
         ></span>
-        <p class="text-[9px] uppercase tracking-[0.3em] font-semibold mb-3" :style="{ color: activeSeasonInk.color }">Leave your mark gently</p>
-        <h2 id="about-story-title" class="text-2xl sm:text-3xl leading-snug tracking-[0.12em] uppercase font-ui-serif mb-5" :style="{ color: activeSeasonInk.color }">Typing can be a quiet ritual.</h2>
+        <p class="text-[9px] uppercase tracking-[0.3em] font-semibold mb-3" :style="{ color: activeSeasonInk.color }">A little stillness in every word</p>
+        <h2 id="about-story-title" class="text-2xl sm:text-3xl leading-snug tracking-[0.12em] uppercase font-ui-serif mb-5" :style="{ color: activeSeasonInk.color }">A place to find your rhythm.</h2>
         <div class="max-w-2xl space-y-4 text-sm leading-7" :style="{ color: activeSeasonInk.color }">
-          <p>Trace is a mindful typing space for slowing down, finding rhythm, and returning to words with intention. Each practice invites you to meet a seasonal passage at your own pace.</p>
-          <p class="opacity-75">There is no failing here. No leaderboard asks you to outrun anyone. Breathe, type, listen, and let each attempt become a small record of attention.</p>
+          <p>Trace began with a simple thought: even a few typed words can make room to breathe. Return for a daily reflection, settle into a seasonal meditation, or let a longer passage carry you into flow.</p>
+          <p class="opacity-75">When you feel like company, share a passage with other travelers in a private circle or a public gathering. Follow their lights across the page, see where you arrive, and keep your own traces in your profile. The leaderboard remembers a moment of speed; it does not define your journey.</p>
         </div>
       </section>
 
@@ -113,18 +114,19 @@ const supportMessage = {
           ></span>
           <p class="text-[9px] uppercase tracking-[0.3em] opacity-55 mb-3">The maker</p>
           <h2 class="text-xl uppercase tracking-[0.16em] font-ui-serif mb-3" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">Jhonnel Anitan</h2>
-          <p class="text-xs sm:text-sm leading-relaxed opacity-70 max-w-lg mb-6">A software engineer shaping Trace as a calm digital space—built carefully, one thoughtful detail at a time.</p>
+          <p class="text-xs sm:text-sm leading-relaxed opacity-70 max-w-lg mb-6">I leave little lights along the page, hoping one finds you when you need a softer place to begin.</p>
 
           <nav aria-label="Creator accounts" class="grid sm:grid-cols-2 gap-3">
             <a
               v-for="link in creatorLinks"
               :key="link.label"
               :href="link.href"
+              :class="{ 'sm:col-span-2': link.label === 'Trace source' }"
               target="_blank"
               rel="noopener noreferrer"
               class="relative isolate min-h-14 px-4 flex items-center justify-between gap-4 group"
             >
-              <span class="absolute inset-0 -z-10 rounded-xl opacity-0 group-hover:opacity-[0.16] transition-[background-color,opacity] duration-700" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></span>
+              <span class="absolute inset-0 -z-10 rounded-xl opacity-[0.12] group-hover:opacity-[0.24] transition-[background-color,opacity] duration-700" :style="{ backgroundColor: activeSeasonInk.backgroundColor, filter: 'url(#ink-blot)' }"></span>
               <span>
                 <span class="block text-[9px] uppercase tracking-[0.2em] font-semibold">{{ link.label }}</span>
                 <span class="block text-[9px] mt-1 opacity-55">{{ link.detail }}</span>
@@ -157,9 +159,6 @@ const supportMessage = {
         </article>
       </section>
 
-      <footer class="pt-6 border-t text-center" :class="settings.darkMode ? 'border-stone-800' : 'border-stone-300'">
-        <p class="text-[9px] uppercase tracking-[0.28em] opacity-45">Designed and tended with care · Trace</p>
-      </footer>
     </div>
   </main>
 
