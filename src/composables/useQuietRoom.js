@@ -10,7 +10,8 @@ import {
   set,
   update
 } from 'firebase/database'
-import { auth, rtdb } from '../services/firebase'
+import { auth, db, rtdb } from '../services/firebase'
+import { doc, getDoc } from 'firebase/firestore'
 import {
   canJoinRoom,
   createRoomCode,
@@ -26,7 +27,8 @@ import {
   ROOM_GRACE_MS,
   ROOM_LIFETIME_MS,
   ROOM_SLOTS,
-  normalizeRoomCode
+  normalizeRoomCode,
+  shouldStartPublicRoom
 } from '../utils/quietRoomProtocol'
 
 const ACTIVE_ROOM_KEY = 'trace_active_multiplayer_room'
@@ -62,9 +64,11 @@ export const useQuietRoom = () => {
   const isBusy = ref(false)
   const connectionState = ref('idle')
   const isOnline = ref(true)
+  const serverOffset = ref(0)
 
   let stopRoom = null
   let stopConnection = null
+  let stopOffset = null
   let disconnectPlayer = null
   let disconnectHost = null
   let progressTimer = null
@@ -81,11 +85,25 @@ export const useQuietRoom = () => {
   const hasEnded = computed(() => room.value?.meta?.status === 'ended')
   const canStart = computed(() => isHost.value && isLobby.value && connectedPlayers.value.length >= MIN_PLAYERS)
 
+  const resolvePlayerNames = async () => {
+    try {
+      const profile = (await getDoc(doc(db, 'users', auth.currentUser.uid))).data()?.profile
+      const preferred = profile?.isAnonymous ? profile.alias : auth.currentUser.displayName
+      const name = String(preferred || '').trim().slice(0, 36)
+      return seat => name || PLAYER_NAMES[seat]
+    } catch {
+      // Never reveal a name when the privacy preference cannot be loaded.
+      return seat => PLAYER_NAMES[seat]
+    }
+  }
+
   const clearListeners = () => {
     stopRoom?.()
     stopConnection?.()
+    stopOffset?.()
     stopRoom = null
     stopConnection = null
+    stopOffset = null
     clearTimeout(progressTimer)
     clearTimeout(publicStartTimer)
     progressTimer = null
@@ -106,9 +124,9 @@ export const useQuietRoom = () => {
     if (auth.currentUser) await remove(databaseRef(rtdb, activePath(auth.currentUser.uid))).catch(() => {})
   }
 
-  const playerPayload = seat => ({
+  const playerPayload = (seat, name = PLAYER_NAMES[seat]) => ({
     uid: auth.currentUser.uid,
-    name: PLAYER_NAMES[seat],
+    name,
     connected: true,
     joinedAt: serverTimestamp(),
     lastSeen: serverTimestamp(),
@@ -182,30 +200,43 @@ export const useQuietRoom = () => {
     if (room.value?.meta?.type !== 'public' || !isLobby.value) return
     const count = connectedPlayers.value.length
     const startsAt = Number(room.value?.meta?.startsAt || 0)
+    const startsRef = databaseRef(rtdb, roomPath(roomCode.value) + '/meta/startsAt')
 
     if (count >= MIN_PLAYERS && !startsAt) {
-      const deadline = Date.now() + (count >= MAX_PLAYERS ? 1_000 : PUBLIC_START_DELAY_MS)
-      set(databaseRef(rtdb, roomPath(roomCode.value) + '/meta/startsAt'), deadline).catch(() => {})
+      const deadline = Date.now() + serverOffset.value + PUBLIC_START_DELAY_MS
+      void runTransaction(startsRef, value => value || deadline, { applyLocally: false }).catch(error => {
+        roomError.value = friendlyError(error)
+      })
       return
     }
-    if (count < MIN_PLAYERS || !startsAt) return
-
     clearTimeout(publicStartTimer)
+    publicStartTimer = null
+    if (count < MIN_PLAYERS) {
+      if (startsAt) void runTransaction(startsRef, value => value === startsAt ? null : undefined, { applyLocally: false }).catch(() => {})
+      return
+    }
+    if (!startsAt) return
+
     publicStartTimer = setTimeout(async () => {
       const snapshot = await get(databaseRef(rtdb, roomPath(roomCode.value))).catch(() => null)
       const current = snapshot?.val()
-      if (current?.meta?.status === 'lobby' && getConnectedPlayers(current.players).length >= MIN_PLAYERS) {
+      if (shouldStartPublicRoom(current, Date.now() + serverOffset.value)) {
+        const statusRef = databaseRef(rtdb, roomPath(roomCode.value) + '/meta/status')
+        const transition = await runTransaction(statusRef, value => value === 'lobby' ? 'playing' : undefined, { applyLocally: false }).catch(() => null)
+        if (!transition?.committed) return
         await update(databaseRef(rtdb, roomPath(roomCode.value) + '/meta'), {
-          status: 'playing',
           startedAt: serverTimestamp(),
           startsAt: null
         }).catch(() => {})
         await remove(databaseRef(rtdb, openPath(roomCode.value))).catch(() => {})
       }
-    }, Math.max(0, startsAt - Date.now()))
+    }, Math.max(0, startsAt - Date.now() - serverOffset.value))
   }
 
   const observeRoom = () => {
+    stopOffset = onValue(databaseRef(rtdb, '.info/serverTimeOffset'), snapshot => {
+      serverOffset.value = Number(snapshot.val()) || 0
+    })
     const target = databaseRef(rtdb, roomPath(roomCode.value))
     stopRoom = onValue(target, snapshot => {
       const nextRoom = snapshot.val()
@@ -286,6 +317,7 @@ export const useQuietRoom = () => {
           reason: current.meta.status === 'lobby' ? 'full' : 'started'
         }
         const candidates = [...ROOM_SLOTS]
+        const playerName = await resolvePlayerNames()
         let claimed = false
         for (const candidate of candidates) {
           const seatRef = databaseRef(rtdb, roomPath(code) + '/players/' + candidate)
@@ -293,7 +325,7 @@ export const useQuietRoom = () => {
             const stale = value?.uid && value.connected === false &&
               Date.now() - Number(value.disconnectedAt || value.lastSeen || 0) > ROOM_GRACE_MS
             if (value?.uid && !stale) return
-            return playerPayload(candidate)
+            return playerPayload(candidate, playerName(candidate))
           }, { applyLocally: false })
           if (result.committed) {
             seat = candidate
@@ -308,8 +340,15 @@ export const useQuietRoom = () => {
       localSeat.value = seat
       snapshot = await get(target)
       room.value = snapshot.val()
+      const playerName = await resolvePlayerNames()
+      const currentName = playerName(seat)
+      if (room.value?.players?.[seat]?.name !== currentName) {
+        await update(databaseRef(rtdb, roomPath(code) + '/players/' + seat), { name: currentName })
+      }
       await rememberRoom(code)
       await attachPresence()
+      const offsetSnapshot = await get(databaseRef(rtdb, '.info/serverTimeOffset')).catch(() => null)
+      serverOffset.value = Number(offsetSnapshot?.val()) || 0
       observeRoom()
       return {
         ok: true,
@@ -331,6 +370,7 @@ export const useQuietRoom = () => {
     if (!auth.currentUser) return { ok: false, reason: 'auth' }
     isBusy.value = true
     try {
+      const playerName = await resolvePlayerNames()
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const code = createRoomCode()
         const target = databaseRef(rtdb, roomPath(code))
@@ -354,7 +394,7 @@ export const useQuietRoom = () => {
             schemaVersion: 2
           },
           players: {
-            one: playerPayload('one')
+            one: playerPayload('one', playerName('one'))
           }
         }
         const result = await runTransaction(target, current => current ? undefined : initial, { applyLocally: false })
@@ -492,6 +532,7 @@ export const useQuietRoom = () => {
     isBusy,
     connectionState,
     isOnline,
+    serverOffset,
     createRoom,
     joinRoom,
     joinPublicRoom,

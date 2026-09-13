@@ -1,7 +1,7 @@
 export const ROOM_CODE_LENGTH = 7
 export const ROOM_GRACE_MS = 30_000
 export const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
-export const PUBLIC_START_DELAY_MS = 12_000
+export const PUBLIC_START_DELAY_MS = 30_000
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 5
 export const WORD_COUNTS = [50, 100, 200]
@@ -80,6 +80,13 @@ export const canJoinRoom = (room, uid, now = Date.now()) => {
   if (findPlayerSeat(room.players, uid)) return true
   return room.meta.status === 'lobby' && Boolean(findOpenSeat(room.players, now))
 }
+
+export const shouldStartPublicRoom = (room, now = Date.now()) =>
+  room?.meta?.type === 'public' &&
+  room.meta.status === 'lobby' &&
+  Number(room.meta.startsAt) > 0 &&
+  now >= Number(room.meta.startsAt) &&
+  getConnectedPlayers(room.players).length >= MIN_PLAYERS
 
 export const calculatePassageProgress = (typedText, passageText) => {
   const total = String(passageText || '').length || 1
