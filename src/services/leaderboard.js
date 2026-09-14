@@ -19,11 +19,11 @@ export const publishLeaderboardResult = async (room, roomCode, player) => {
       !LEADERBOARD_WORD_COUNTS.includes(count) || !isEligibleLeaderboardResult(player, room?.meta?.forfeits) ||
       !Number.isFinite(Number(room?.meta?.endedAt))) return false
 
-  let profile
-  try { profile = (await getDoc(doc(db, 'users', uid))).data()?.profile } catch { /* Prefer a safe alias if privacy cannot be read. */ }
+  // A successfully loaded account with no saved profile uses the public-name
+  // default from Profile.vue. A failed read cannot establish that preference.
+  let profile = { isAnonymous: true }
+  try { profile = (await getDoc(doc(db, 'users', uid))).data()?.profile ?? { isAnonymous: false } } catch { /* Keep the name private until the preference can be read. */ }
   const identity = publicIdentity(uid, profile, auth.currentUser.displayName)
-  // An unavailable profile is not permission to disclose the account name.
-  if (!profile) identity.displayName = leaderboardDisplayName(uid, { isAnonymous: true }, '')
 
   const endedAt = Number(room.meta.endedAt)
   const result = await runTransaction(databaseRef(rtdb, boardPath(count, uid)), previous =>
@@ -44,6 +44,16 @@ export const syncLeaderboardIdentity = async (profile, user = auth.currentUser) 
       return { roomCode, seat, wpm, accuracy, elapsedMs, recordedAt, ...identity }
     }, { applyLocally: false })
   ))
+}
+
+// Repair entries created while a profile read was unavailable. Only the owner
+// may refresh their display name, after their privacy preference loads.
+export const refreshLeaderboardIdentity = async (user = auth.currentUser) => {
+  if (!user?.uid) return false
+  const profile = (await getDoc(doc(db, 'users', user.uid))).data()?.profile ?? { isAnonymous: false }
+  if (auth.currentUser?.uid !== user.uid) return false
+  await syncLeaderboardIdentity(profile, user)
+  return true
 }
 
 export const subscribeLeaderboard = (wordCount, sortBy, onRecords, onError) => {
