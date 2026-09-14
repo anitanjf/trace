@@ -84,7 +84,7 @@ const supportMessage = {
         <h2 id="about-story-title" class="text-2xl sm:text-3xl leading-snug tracking-[0.12em] uppercase font-ui-serif mb-5" :style="{ color: activeSeasonInk.color }">A place to find your rhythm.</h2>
         <div class="max-w-2xl space-y-4 text-sm leading-7" :style="{ color: activeSeasonInk.color }">
           <p>Trace began with a simple thought: even a few typed words can make room to breathe. Return for a daily reflection, settle into a seasonal meditation, or let a longer passage carry you into flow.</p>
-          <p class="opacity-75">When you feel like company, share a passage with other travelers in a private circle or a public gathering. Follow their lights across the page, see where you arrive, and keep your own traces in your profile. The leaderboard remembers a moment of speed; it does not define your journey.</p>
+          <p class="opacity-75">When you feel like company, share a passage with other travelers in a private circle or a public gathering. Follow their lights across the page, see where you arrive, and keep your own traces in your profile. The leaderboard remembers your quickest clear passage; it does not define your own.</p>
         </div>
       </section>
 

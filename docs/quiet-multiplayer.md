@@ -26,6 +26,8 @@ Publish database.rules.json under Realtime Database → Rules. These are not Fir
 
 ## Leaderboards
 
-The home menu links to three boards: 50, 100 and 200 words. Each signed-in traveler can place one personal best per length; only completed rooms with at least 90% accuracy qualify. The board ranks recorded WPM, breaking ties by accuracy and time. Public board entries include only a room reference, seat, score and timestamp; the UI creates a stable anonymous trail name from the Firebase UID without reading the player's private profile. Only authenticated users can read the top 100 entries per length. No existing match can be backfilled after its room expires.
+The home menu links to 50, 100 and 200-word boards. Only completed, non-forfeited matches with at least 80% clarity qualify. Each player retains one fastest match per length. Higher WPM wins; equal WPM uses higher clarity, then shorter elapsed time. A slower match never replaces a faster qualifying result. The top 100 can be sorted by WPM or clarity, both taken from that same saved match.
 
-The new `multiplayerLeaderboard` section in `database.rules.json` must be published to **Realtime Database → Rules** before new entries can be submitted. The rules restrict entries to the player's own best result from an ended room and index WPM. As the underlying match timing and keystrokes are still written by the clients, this is not an anti-cheat system; a trusted server would be necessary for authoritative competitive rankings.
+Players show their account name or their chosen privacy alias. Country defaults to unset and is displayed with a flag only when chosen in Profile. Identity changes refresh existing entries without changing scores.
+
+Publish the updated `database.rules.json` to **Realtime Database → Rules**. Rules validate scores against a completed room, prevent slower replacements, allow identity-only updates, and index WPM and clarity. Match submission requires its room to still exist. Client-written match metrics are not an authoritative anti-cheat system.
