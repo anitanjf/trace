@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { runInNewContext } from 'node:vm'
 import {
   isEligibleLeaderboardResult,
   leaderboardAlias,
@@ -66,4 +67,35 @@ assert.match(rules.multiplayerLeaderboard.$length.$uid['.validate'], /accuracy'\
 assert.doesNotMatch(rules.multiplayerLeaderboard.$length.$uid['.validate'], /totalWpm/)
 assert.match(rules.multiplayerLeaderboard.$length.$uid['.validate'], /countryCode/)
 assert.match(rules.multiplayerLeaderboard.$length.$uid['.write'], /auth\.uid === \$uid/)
+
+// Check the proposed database payload against the same expressions we publish.
+// This is a local rules check, not a substitute for the Firebase emulator.
+const leaderboardRule = rules.multiplayerLeaderboard.$length.$uid
+const snapshot = value => ({
+  val: () => value,
+  exists: () => value !== undefined && value !== null,
+  isString: () => typeof value === 'string',
+  isNumber: () => typeof value === 'number',
+  hasChildren: keys => keys.every(key => Object.hasOwn(value, key)),
+  child: path => snapshot(String(path).split('/').reduce((child, key) => child?.[key], value))
+})
+const canWrite = (entry, room, previous = null) => {
+  const context = {
+    root: snapshot({ multiplayerRooms: { ABCDEFG: room } }),
+    newData: snapshot(entry), data: snapshot(previous),
+    auth: { uid: 'player-one' }, $uid: 'player-one', $length: '50'
+  }
+  runInNewContext('String.prototype.matches = function (pattern) { return pattern.test(this) }', context)
+  return Boolean(runInNewContext(leaderboardRule['.write'], context) &&
+    runInNewContext(leaderboardRule['.validate'], context))
+}
+const testRoom = { meta: { status: 'ended', wordCount: 50 }, players: {
+  one: { uid: 'player-one', complete: true, wpm: 46, accuracy: 85, elapsedMs: 66000 }
+} }
+const testEntry = { roomCode: 'ABCDEFG', seat: 'one', wpm: 46, accuracy: 85,
+  elapsedMs: 66000, recordedAt: 123456, displayName: 'Quiet River', countryCode: '' }
+assert.equal(canWrite(testEntry, testRoom), true)
+assert.equal(canWrite({ ...testEntry, accuracy: 79 }, testRoom), false)
+assert.equal(canWrite({ ...testEntry, wpm: 47 }, testRoom), false)
+assert.equal(canWrite(testEntry, { ...testRoom, players: { one: { ...testRoom.players.one, uid: 'someone-else' } } }), false)
 console.log('Multiplayer leaderboard checks passed.')
