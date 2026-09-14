@@ -110,7 +110,7 @@ watch([hasEnded, localPlayer], ([ended, player]) => {
   if (!publishedLeaderboardRooms.has(roomCode.value)) {
     publishedLeaderboardRooms.add(roomCode.value)
     void publishLeaderboardResult(room.value, roomCode.value, { ...player, seat: localSeat.value })
-      .catch(() => { joinError.value = 'Your leaderboard result could not be saved. Check the Realtime Database rules and your connection.' })
+      .catch(() => { joinError.value = 'Your result is saved in your profile, but could not join the leaderboard. Publish the updated Realtime Database rules, then check the recent result on the leaderboard.' })
   }
 }, { immediate: true })
 const playerInitials = name => String(name || 'Traveler').trim().split(/\s+/).slice(0, 2).map(part => part[0]).join('').toUpperCase()

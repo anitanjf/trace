@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { currentUser, settings } from '../store'
-import { subscribeLeaderboard } from '../services/leaderboard'
+import { currentUser, settings, stats } from '../store'
+import { retryRecentLeaderboardResult, subscribeLeaderboard } from '../services/leaderboard'
 import { leaderboardAlias, LEADERBOARD_WORD_COUNTS, MIN_LEADERBOARD_ACCURACY, rankLeaderboard } from '../utils/leaderboard'
 import { countryFlag, countryName } from '../utils/countries'
 import AuthModal from '../components/AuthModal.vue'
@@ -15,6 +15,21 @@ const entries = ref([])
 const loading = ref(false)
 const error = ref('')
 const showAuth = ref(false)
+const retrying = ref(false)
+const retryMessage = ref('')
+const hasRecentResult = computed(() => Object.values(stats.value.multiplayerMatches || {}).some(
+  match => Number(match.wordCount) === selectedLength.value && match.finished && !match.dnf && Number(match.accuracy) >= MIN_LEADERBOARD_ACCURACY
+))
+const retryResult = async () => {
+  retrying.value = true
+  retryMessage.value = ''
+  try {
+    const saved = await retryRecentLeaderboardResult(stats.value.multiplayerMatches, selectedLength.value)
+    retryMessage.value = saved ? 'Your result has joined the board.' : 'That result could not be recovered from an ended room. A new qualifying match will count once the leaderboard rules are updated.'
+  } catch {
+    retryMessage.value = 'The result is still waiting. The Realtime Database leaderboard rules need to be updated.'
+  } finally { retrying.value = false }
+}
 const ranked = computed(() => rankLeaderboard(entries.value, selectedSort.value))
 const yourRank = computed(() => ranked.value.findIndex(entry => entry.uid === currentUser.value?.uid) + 1)
 const displayName = entry => entry.displayName || leaderboardAlias(entry.uid)
@@ -114,6 +129,11 @@ onBeforeUnmount(() => unsubscribe?.())
           </ol>
           <p class="mt-8 text-[10px] leading-relaxed text-center opacity-55">Only the name or alias you share, your chosen country, and your personal-best result appear here. Country is optional.</p>
         </template>
+        <div v-if="currentUser && hasRecentResult && !yourRank && !loading" class="mt-6 text-center">
+          <p class="text-xs opacity-70 mb-3">Finished a qualifying match but don’t see it here?</p>
+          <InkButton variant="soft" :disabled="retrying" @click="retryResult">{{ retrying ? 'Checking your result…' : 'Check recent result' }}</InkButton>
+        </div>
+        <p v-if="retryMessage" class="mt-3 text-xs text-center opacity-75" role="status">{{ retryMessage }}</p>
       </section>
     </div>
     <AuthModal v-if="showAuth" @close="showAuth = false" />
