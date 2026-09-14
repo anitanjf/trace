@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { settings, currentUser, stats } from '../store'
 import { logOut, db } from '../services/firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
+import { syncLeaderboardIdentity } from '../services/leaderboard'
+import { countryFlag, countryName, countryOptions, isCountryCode } from '../utils/countries'
 import AuthModal from '../components/AuthModal.vue'
 import Heatmap from '../components/Heatmap.vue'
 import { seasonInkPalette } from '../utils/constants'
@@ -64,18 +66,21 @@ const achievementDefs = {
 }
 
 const isEditing = ref(false)
-const customProfile = ref({
-  bio: '', github: '', twitter: '', website: '', alias: 'A Wandering Soul', isAnonymous: false
+const defaultProfile = () => ({
+  bio: '', github: '', twitter: '', website: '', alias: 'A Wandering Soul', isAnonymous: false, countryCode: ''
 })
+const customProfile = ref(defaultProfile())
 
 const fetchProfile = async () => {
   if (!currentUser.value) return
+  const uid = currentUser.value.uid
   profileMessage.value = ''
   try {
-    const docRef = doc(db, 'users', currentUser.value.uid)
+    const docRef = doc(db, 'users', uid)
     const snap = await getDoc(docRef)
-    if (snap.exists() && snap.data().profile) {
-      customProfile.value = { ...customProfile.value, ...snap.data().profile }
+    if (currentUser.value?.uid === uid && snap.exists() && snap.data().profile) {
+      customProfile.value = { ...defaultProfile(), ...snap.data().profile }
+      if (!isCountryCode(customProfile.value.countryCode)) customProfile.value.countryCode = ''
     }
   } catch (err) {
     profileMessageType.value = 'error'
@@ -85,13 +90,25 @@ const fetchProfile = async () => {
 
 const saveProfile = async () => {
   if (!currentUser.value) return
+  if (!isCountryCode(customProfile.value.countryCode)) {
+    profileMessageType.value = 'error'
+    profileMessage.value = 'Choose a country from the list or leave it unset.'
+    return
+  }
+  const user = currentUser.value
   profileMessage.value = ''
   try {
-    const docRef = doc(db, 'users', currentUser.value.uid)
+    const docRef = doc(db, 'users', user.uid)
     await setDoc(docRef, { profile: customProfile.value }, { merge: true })
     isEditing.value = false
     profileMessageType.value = 'success'
     profileMessage.value = 'Profile saved.'
+    try {
+      await syncLeaderboardIdentity(customProfile.value, user)
+    } catch {
+      profileMessageType.value = 'error'
+      profileMessage.value = 'Profile saved, but the leaderboard could not refresh your name or country. Check your connection and Realtime Database rules.'
+    }
   } catch (err) {
     profileMessageType.value = 'error'
     profileMessage.value = err?.message || 'Could not save your profile. Your edits are still here.'
@@ -104,6 +121,7 @@ onMounted(() => {
 })
 
 watch(currentUser, (newUser) => {
+  customProfile.value = defaultProfile()
   if (newUser) { showAuthModal.value = false; fetchProfile() }
 })
 
@@ -272,6 +290,9 @@ const radarData = computed(() => {
             <div v-else class="text-[9px] uppercase tracking-[0.2em] opacity-50 mb-6 italic" :class="settings.darkMode ? 'text-stone-500' : 'text-stone-400'">
               Hidden Identity
             </div>
+            <p v-if="customProfile.countryCode && !isEditing" class="mb-5 text-[10px] tracking-wide opacity-75" :title="countryName(customProfile.countryCode)">
+              <span aria-hidden="true" class="mr-1">{{ countryFlag(customProfile.countryCode) }}</span>{{ countryName(customProfile.countryCode) }}
+            </p>
             
             <template v-if="!isEditing">
               <p class="text-xs leading-loose mb-6 opacity-90 font-light w-full max-w-[280px] md:max-w-[220px]" :class="settings.darkMode ? 'text-stone-300' : 'text-stone-800'">
@@ -299,6 +320,14 @@ const radarData = computed(() => {
                   <div v-if="customProfile.isAnonymous" class="flex flex-col gap-1 mt-1">
                     <span class="text-[8px] uppercase tracking-widest opacity-50">Wandering Alias</span>
                     <input v-model="customProfile.alias" type="text" placeholder="e.g. A Silent Monk" class="w-full bg-transparent border-b p-1 text-xs focus:outline-none" :class="settings.darkMode ? 'border-stone-700 text-stone-200 focus:border-stone-500' : 'border-stone-300 text-stone-800 focus:border-stone-500'" />
+                  </div>
+                  <div class="flex flex-col gap-1 mt-1">
+                    <label for="profile-country" class="text-[8px] uppercase tracking-widest opacity-70">Country · optional</label>
+                    <select id="profile-country" v-model="customProfile.countryCode" class="w-full min-h-11 bg-transparent border-b p-1 text-xs" :style="{ colorScheme: settings.darkMode ? 'dark' : 'light' }" :class="settings.darkMode ? 'border-stone-700 text-stone-200' : 'border-stone-300 text-stone-800'">
+                      <option value="">Not set</option>
+                      <option v-for="country in countryOptions" :key="country.code" :value="country.code">{{ countryFlag(country.code) }} {{ country.name }}</option>
+                    </select>
+                    <span class="text-[9px] leading-relaxed opacity-60">Shown on the leaderboard only if you choose one. We do not detect your location.</span>
                   </div>
                   <div class="flex flex-col gap-1 mt-1">
                     <span class="text-[8px] uppercase tracking-widest opacity-50">Reflection / Bio</span>
