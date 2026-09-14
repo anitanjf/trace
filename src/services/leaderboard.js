@@ -1,4 +1,4 @@
-import { limitToLast, onValue, orderByChild, query, ref as databaseRef, runTransaction } from 'firebase/database'
+import { get, limitToLast, onValue, orderByChild, query, ref as databaseRef, runTransaction } from 'firebase/database'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db, rtdb } from './firebase'
 import { isCountryCode } from '../utils/countries'
@@ -40,10 +40,8 @@ export const syncLeaderboardIdentity = async (profile, user = auth.currentUser) 
     runTransaction(databaseRef(rtdb, boardPath(count, user.uid)), previous => {
       if (!previous) return
       if (previous.displayName === identity.displayName && previous.countryCode === identity.countryCode) return
-      return {
-        ...previous,
-        ...identity
-      }
+      const { roomCode, seat, wpm, accuracy, elapsedMs, recordedAt } = previous
+      return { roomCode, seat, wpm, accuracy, elapsedMs, recordedAt, ...identity }
     }, { applyLocally: false })
   ))
 }
@@ -56,4 +54,24 @@ export const subscribeLeaderboard = (wordCount, sortBy, onRecords, onError) => {
   return onValue(topRecords, snapshot => {
     onRecords(Object.entries(snapshot.val() || {}).map(([uid, result]) => ({ uid, ...result })))
   }, onError)
+}
+
+// An ended room remains readable for a while. Recover a qualifying match that
+// could not be submitted before Realtime Database rules were updated. Scores
+// always come from the room, never from the local profile summary.
+export const retryRecentLeaderboardResult = async (matches, wordCount) => {
+  const uid = auth.currentUser?.uid
+  if (!uid) return false
+  const candidates = Object.entries(matches || {})
+    .filter(([, match]) => Number(match?.wordCount) === Number(wordCount) && match.finished && !match.dnf && Number(match.accuracy) >= 80)
+    .sort(([, a], [, b]) => Number(b.wpm) - Number(a.wpm))
+    .slice(0, 12)
+  for (const [code] of candidates) {
+    const snapshot = await get(databaseRef(rtdb, `multiplayerRooms/${code}`))
+    const room = snapshot.val()
+    if (room?.meta?.status !== 'ended') continue
+    const player = Object.entries(room.players || {}).find(([, record]) => record.uid === uid)
+    if (player && await publishLeaderboardResult(room, code, { ...player[1], seat: player[0] })) return true
+  }
+  return false
 }
