@@ -58,7 +58,7 @@ assert.match(typingBoard, /solo-flight-light/)
 assert.match(typingBoard, /overflow-y-auto no-scrollbar/)
 assert.match(completionStats, /ui\/InkButton/)
 assert.doesNotMatch(completionStats, /Preserved in Archive|#DFBE73/i)
-assert.match(atmosphere, /isTypingRoute \? 'opacity-\[0\.42\]' : 'opacity-100'/)
+assert.match(atmosphere, /isTypingRoute \? 'opacity-\[0\.42\]' : 'opacity-\[0\.55\]'/)
 for (const practiceRoute of ['/meditation', '/daily', '/flow', '/multiplayer']) {
   assert.ok(atmosphere.includes(practiceRoute), `Missing quieter atmosphere on ${practiceRoute}`)
 }
