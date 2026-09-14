@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fallbackQuotes, seasons } from '../utils/constants'
 import { currentUser, settings, recordMultiplayerMatch } from '../store'
-import { publishPersonalBest } from '../services/leaderboard'
+import { publishLeaderboardResult } from '../services/leaderboard'
 import {
   buildSharedPassage,
   MAX_PLAYERS,
@@ -90,7 +90,7 @@ const fireflyColors = {
 }
 
 const winner = computed(() => finishers.value.find(player => !forfeits.value[player.seat]) || null)
-const publishedBestRooms = new Set()
+const publishedLeaderboardRooms = new Set()
 watch([hasEnded, localPlayer], ([ended, player]) => {
   if (!ended || !player || !roomCode.value || !currentUser.value) return
   const ranked = finishers.value
@@ -107,9 +107,9 @@ watch([hasEnded, localPlayer], ([ended, player]) => {
     accuracy: player.accuracy,
     elapsedMs: player.elapsedMs
   })
-  if (!publishedBestRooms.has(roomCode.value)) {
-    publishedBestRooms.add(roomCode.value)
-    void publishPersonalBest(room.value, roomCode.value, { ...player, seat: localSeat.value })
+  if (!publishedLeaderboardRooms.has(roomCode.value)) {
+    publishedLeaderboardRooms.add(roomCode.value)
+    void publishLeaderboardResult(room.value, roomCode.value, { ...player, seat: localSeat.value })
       .catch(() => { joinError.value = 'Your leaderboard result could not be saved. Check the Realtime Database rules and your connection.' })
   }
 }, { immediate: true })

@@ -2,7 +2,7 @@
 
 **Leave your mark gently.**
 
-Trace is a mindful typing space for seasonal reflection, quiet focus, and progress without pressure. There is no failing, no ticking clock, and no leaderboard to outrun—only words, breath, and another chance to begin.
+Trace is a mindful typing space for seasonal reflection, quiet focus, and progress without pressure. Solo practice has no failing or ticking clock; shared passages offer a gentle multiplayer leaderboard without defining your journey.
 
 ## The experience
 
