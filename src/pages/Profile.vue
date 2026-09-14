@@ -5,7 +5,8 @@ import { settings, currentUser, stats } from '../store'
 import { logOut, db } from '../services/firebase'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { syncLeaderboardIdentity } from '../services/leaderboard'
-import { countryFlag, countryName, countryOptions, isCountryCode } from '../utils/countries'
+import { countryFlag, countryName, isCountryCode } from '../utils/countries'
+import CountryPicker from '../components/ui/CountryPicker.vue'
 import AuthModal from '../components/AuthModal.vue'
 import Heatmap from '../components/Heatmap.vue'
 import { seasonInkPalette } from '../utils/constants'
@@ -322,11 +323,7 @@ const radarData = computed(() => {
                     <input v-model="customProfile.alias" type="text" placeholder="e.g. A Silent Monk" class="w-full bg-transparent border-b p-1 text-xs focus:outline-none" :class="settings.darkMode ? 'border-stone-700 text-stone-200 focus:border-stone-500' : 'border-stone-300 text-stone-800 focus:border-stone-500'" />
                   </div>
                   <div class="flex flex-col gap-1 mt-1">
-                    <label for="profile-country" class="text-[8px] uppercase tracking-widest opacity-70">Country · optional</label>
-                    <select id="profile-country" v-model="customProfile.countryCode" class="w-full min-h-11 bg-transparent border-b p-1 text-xs" :style="{ colorScheme: settings.darkMode ? 'dark' : 'light' }" :class="settings.darkMode ? 'border-stone-700 text-stone-200' : 'border-stone-300 text-stone-800'">
-                      <option value="">Not set</option>
-                      <option v-for="country in countryOptions" :key="country.code" :value="country.code">{{ countryFlag(country.code) }} {{ country.name }}</option>
-                    </select>
+                    <CountryPicker v-model="customProfile.countryCode" />
                     <span class="text-[9px] leading-relaxed opacity-60">Shown on the leaderboard only if you choose one. We do not detect your location.</span>
                   </div>
                   <div class="flex flex-col gap-1 mt-1">
