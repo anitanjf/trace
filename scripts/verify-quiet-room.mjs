@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import {
   buildSharedPassage,
+  BOARD_PREPARE_MS,
   calculateMatchStats,
   canEnterByInvitation,
   canJoinRoom,
@@ -18,6 +19,7 @@ import {
   ROOM_GRACE_MS,
   ROOM_SLOTS,
   shouldRemoveRoomOnLeave,
+  shouldBeginPreparedMatch,
   WORD_COUNTS,
   shouldStartPublicRoom
 } from '../src/utils/quietRoomProtocol.js'
@@ -25,6 +27,7 @@ import {
 assert.equal(MIN_PLAYERS, 2)
 assert.equal(MAX_PLAYERS, 5)
 assert.equal(MATCH_IDLE_MS, 30_000)
+assert.equal(BOARD_PREPARE_MS, 8_000)
 assert.equal(MATCH_RITUAL_MS, 3_600)
 assert.equal(PUBLIC_START_DELAY_MS, 30_000)
 assert.deepEqual(ROOM_SLOTS, ['one', 'two', 'three', 'four', 'five'])
@@ -92,4 +95,17 @@ assert.equal(forfeitReason(contestants.three, started, now), 'disconnected')
 assert.equal(forfeitReason(contestants.four, started, now), null)
 assert.equal(getMatchPlayers(contestants, { one: { reason: 'idle' }, three: { reason: 'disconnected' } }).length, 2)
 assert.equal(isRoomExpired({ status: 'playing', expiresAt: now + 1000, hostDisconnectedAt: started }, now), false)
+
+const preparingRoom = {
+  meta: { status: 'playing', startedAt: null, prepareBy: now + BOARD_PREPARE_MS },
+  players: {
+    one: { uid: 'host', boardReady: true },
+    two: { uid: 'guest', boardReady: false }
+  }
+}
+assert.equal(shouldBeginPreparedMatch(preparingRoom, now), false)
+preparingRoom.players.two.boardReady = true
+assert.equal(shouldBeginPreparedMatch(preparingRoom, now), true)
+preparingRoom.players.two.boardReady = false
+assert.equal(shouldBeginPreparedMatch(preparingRoom, now + BOARD_PREPARE_MS), true)
 console.log('Shared Passage protocol checks passed.')

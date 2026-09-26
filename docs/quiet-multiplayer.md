@@ -17,13 +17,19 @@ The numeric progress bars were removed. Each participant is represented by a dis
 
 Every match opens with a synchronized Settle → Breathe → Begin ritual. A light hovers quietly before typing, lengthens its curved trail as pace rises, flutters briefly after a mistake, and settles into a pulse at the finish. Only lights on the local reader's current line are visible, while short poetic cues describe nearby or distant positions without a progress bar.
 
+Before the ritual, every browser preloads its fonts, measures the shared board, and marks that board ready. The room begins as soon as every active board is ready, with an eight-second fallback so one slow device cannot hold the room indefinitely. Remote fireflies predict a short distance between network samples and ease back to authoritative progress, which hides ordinary Realtime Database jitter without changing the recorded race result. Camera movement is line-anchored and remeasured through the full transition so lights remain attached to their words.
+
 ## Lifecycle
 
 A disconnected seat remains reserved for 30 seconds. Returning through Home → Multiplayer or the invitation link resumes that seat. After the grace period, rules reject new claims and clients ignore the expired room. Connected clients remove expired records opportunistically.
 
+During that grace period the local page shows a poetic reconnect countdown. The disconnected light dims for every traveler and returns to full glow when presence is restored.
+
 An active match ends with an ink-mark message when fewer than two connected travelers remain.
 
 Completed results remain readable until each traveler leaves. They include WPM, clarity, time, mistakes, flags or public avatars when shared, and quiet personal milestones. A private host can propose a new 50, 100, or 200-word passage from the result screen. Each traveler answers independently, the host sees every ready/waiting state, and the next private room can open after at least two lights are ready. The completed room keeps a rematch pointer so ready travelers can choose when to follow. Public players can return directly to matchmaking for the same length.
+
+The local result also compares WPM, clarity, and elapsed time with earlier completed matches at the same word length. These comparisons remain private profile feedback and do not alter public ranking.
 
 Match arrivals, starts, finishes, and results use the existing **Interface & match cues** preference. They stay silent when that preference is off.
 

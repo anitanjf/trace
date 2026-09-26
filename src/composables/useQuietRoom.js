@@ -15,6 +15,7 @@ import { doc, getDoc } from 'firebase/firestore'
 import {
   canEnterByInvitation,
   canJoinRoom,
+  BOARD_PREPARE_MS,
   createRoomCode,
   findOpenSeat,
   findPlayerSeat,
@@ -32,7 +33,8 @@ import {
   ROOM_SLOTS,
   normalizeRoomCode,
   shouldStartPublicRoom,
-  shouldRemoveRoomOnLeave
+  shouldRemoveRoomOnLeave,
+  shouldBeginPreparedMatch
 } from '../utils/quietRoomProtocol'
 
 const ACTIVE_ROOM_KEY = 'trace_active_multiplayer_room'
@@ -80,6 +82,7 @@ export const useQuietRoom = () => {
   let cleanupTimer = null
   let matchWatchdog = null
   let reconciling = false
+  let coordinatingPreparedStart = false
   let intentionallyLeaving = false
 
   const players = computed(() => room.value?.meta?.status === 'lobby'
@@ -149,6 +152,7 @@ export const useQuietRoom = () => {
     lastSeen: serverTimestamp(),
     disconnectedAt: null,
     progress: 0,
+    boardReady: false,
     complete: false,
     finishOrder: 0
   })
@@ -239,11 +243,27 @@ export const useQuietRoom = () => {
     if (!canStart.value) return { ok: false, reason: 'players' }
     await update(databaseRef(rtdb, roomPath(roomCode.value) + '/meta'), {
       status: 'playing',
-      startedAt: serverTimestamp(),
+      startedAt: null,
+      prepareBy: Date.now() + serverOffset.value + BOARD_PREPARE_MS,
       startsAt: null
     })
     await remove(databaseRef(rtdb, openPath(roomCode.value))).catch(() => {})
     return { ok: true }
+  }
+
+  const coordinatePreparedStart = async () => {
+    const code = roomCode.value
+    if (!code || coordinatingPreparedStart || !shouldBeginPreparedMatch(room.value, Date.now() + serverOffset.value)) return
+    coordinatingPreparedStart = true
+    try {
+      const startedRef = databaseRef(rtdb, roomPath(code) + '/meta/startedAt')
+      const now = Date.now() + serverOffset.value
+      await runTransaction(startedRef, value => value || now, { applyLocally: false }).catch(error => {
+        roomError.value = friendlyError(error)
+      })
+    } finally {
+      coordinatingPreparedStart = false
+    }
   }
 
   const coordinatePublicStart = () => {
@@ -275,7 +295,8 @@ export const useQuietRoom = () => {
         const transition = await runTransaction(statusRef, value => value === 'lobby' ? 'playing' : undefined, { applyLocally: false }).catch(() => null)
         if (!transition?.committed) return
         await update(databaseRef(rtdb, roomPath(roomCode.value) + '/meta'), {
-          startedAt: serverTimestamp(),
+          startedAt: null,
+          prepareBy: Date.now() + serverOffset.value + BOARD_PREPARE_MS,
           startsAt: null
         }).catch(() => {})
         await remove(databaseRef(rtdb, openPath(roomCode.value))).catch(() => {})
@@ -318,7 +339,10 @@ export const useQuietRoom = () => {
 
       connectionState.value = nextRoom.meta.status
 
-      if (nextRoom.meta.status === 'playing') void reconcileMatch()
+      if (nextRoom.meta.status === 'playing') {
+        void coordinatePreparedStart()
+        if (nextRoom.meta.startedAt) void reconcileMatch()
+      }
       coordinatePublicStart()
     }, error => {
       roomError.value = friendlyError(error)
@@ -333,7 +357,11 @@ export const useQuietRoom = () => {
         roomError.value = friendlyError(error)
       })
     })
-    matchWatchdog = setInterval(() => { if (isPlaying.value) void reconcileMatch() }, 1000)
+    matchWatchdog = setInterval(() => {
+      if (!isPlaying.value) return
+      if (!room.value?.meta?.startedAt) void coordinatePreparedStart()
+      else void reconcileMatch()
+    }, 500)
   }
 
   const resetLocalRoom = () => {
@@ -571,6 +599,15 @@ export const useQuietRoom = () => {
     }, PROGRESS_THROTTLE_MS)
   }
 
+  const publishBoardReady = async () => {
+    if (!roomCode.value || !localSeat.value || !isPlaying.value || room.value?.meta?.startedAt || localPlayer.value?.boardReady) return
+    await update(databaseRef(rtdb, roomPath(roomCode.value) + '/players/' + localSeat.value), {
+      boardReady: true,
+      boardReadyAt: serverTimestamp(),
+      lastSeen: serverTimestamp()
+    }).catch(error => { roomError.value = friendlyError(error) })
+  }
+
   const suspendRoom = async () => {
     if (!roomCode.value || !localSeat.value) return
     if (hasEnded.value) return leaveRoom()
@@ -654,6 +691,7 @@ export const useQuietRoom = () => {
     startMatch,
     leaveRoom,
     suspendRoom,
+    publishBoardReady,
     publishProgress
   }
 }
