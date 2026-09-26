@@ -61,7 +61,6 @@ const supportMessage = {
     <div class="w-full max-w-4xl mx-auto px-5 sm:px-8 pt-10 sm:pt-14 pb-20">
       <header class="flex items-end justify-between gap-5 mb-8 sm:mb-10">
         <div>
-          <p class="text-[9px] uppercase tracking-[0.35em] opacity-55 mb-2">Behind the quiet</p>
           <h1 class="text-3xl sm:text-4xl tracking-[0.28em] uppercase font-light font-ui-serif" :class="settings.darkMode ? 'text-stone-100' : 'text-stone-900'">About Trace</h1>
         </div>
         <button @click="router.push('/')" aria-label="Return to menu" class="relative isolate min-h-11 px-5 group">
