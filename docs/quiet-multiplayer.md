@@ -14,11 +14,17 @@ Players choose Short Breath (50 words), Steady Breath (100 words), or Deep Exhal
 
 The numeric progress bars were removed. Each participant is represented by a distinct colored firefly moving toward dawn. Finishing order appears only after all remaining players finish. The room shares progress and match metrics (WPM, accuracy, elapsed time and mistakes), but not the typed passage input itself.
 
+Every match opens with a synchronized Settle → Breathe → Begin ritual. A light hovers quietly before typing, lengthens its curved trail as pace rises, flutters briefly after a mistake, and settles into a pulse at the finish. Only lights on the local reader's current line are visible, while short poetic cues describe nearby or distant positions without a progress bar.
+
 ## Lifecycle
 
 A disconnected seat remains reserved for 30 seconds. Returning through Home → Multiplayer or the invitation link resumes that seat. After the grace period, rules reject new claims and clients ignore the expired room. Connected clients remove expired records opportunistically.
 
 An active match ends with an ink-mark message when fewer than two connected travelers remain.
+
+Completed results remain readable until each traveler leaves. They include WPM, clarity, time, mistakes, flags or public avatars when shared, and quiet personal milestones. A private host can open a new 50, 100, or 200-word room from the result screen; the completed room keeps a rematch pointer so the other travelers can choose to follow. Public players can return directly to matchmaking for the same length.
+
+Match arrivals, starts, finishes, and results use the existing **Interface & match cues** preference. They stay silent when that preference is off.
 
 ## Firebase
 

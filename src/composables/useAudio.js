@@ -405,6 +405,40 @@ export const playKeystrokeSound = ({ mistake = false, backspace = false } = {}) 
   })
 }
 
+// Short multiplayer cues use the existing Interface sounds preference. They
+// are deliberately sparse so a race still feels like a quiet practice.
+export const playMatchCue = (kind = 'arrival') => {
+  if (!settings.value.interfaceSound || clamp(settings.value.interfaceVolume) <= 0 || practicePaused) return
+  if (!audioUnlocked) {
+    void unlockAudio()
+    return
+  }
+  const volume = clamp(settings.value.interfaceVolume)
+  const notes = {
+    arrival: [{ frequency: 360, delay: 0, duration: .12, level: .045 }],
+    settle: [{ frequency: 294, delay: 0, duration: .22, level: .04 }],
+    begin: [{ frequency: 392, delay: 0, duration: .15, level: .05 }, { frequency: 523, delay: .13, duration: .24, level: .04 }],
+    finish: [{ frequency: 440, delay: 0, duration: .2, level: .045 }, { frequency: 659, delay: .16, duration: .36, level: .035 }],
+    results: [{ frequency: 330, delay: 0, duration: .22, level: .035 }, { frequency: 494, delay: .14, duration: .3, level: .032 }, { frequency: 659, delay: .28, duration: .42, level: .028 }]
+  }
+  const context = getAudioContext()
+  if (!context || context.state !== 'running' || document.hidden) return
+  for (const note of notes[kind] || notes.arrival) {
+    const oscillator = context.createOscillator()
+    const gain = context.createGain()
+    const start = context.currentTime + note.delay
+    oscillator.type = 'sine'
+    oscillator.frequency.setValueAtTime(note.frequency, start)
+    gain.gain.setValueAtTime(.0001, start)
+    gain.gain.exponentialRampToValueAtTime(Math.max(.0001, note.level * volume), start + .045)
+    gain.gain.exponentialRampToValueAtTime(.0001, start + note.duration)
+    oscillator.connect(gain)
+    gain.connect(context.destination)
+    oscillator.start(start)
+    oscillator.stop(start + note.duration + .02)
+  }
+}
+
 const playInterfaceClick = () => {
   if (!settings.value.interfaceSound || clamp(settings.value.interfaceVolume) <= 0) return
   playTap({

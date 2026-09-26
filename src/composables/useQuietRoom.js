@@ -94,15 +94,19 @@ export const useQuietRoom = () => {
   const hasEnded = computed(() => room.value?.meta?.status === 'ended')
   const canStart = computed(() => isHost.value && isLobby.value && connectedPlayers.value.length >= MIN_PLAYERS)
 
-  const resolvePlayerNames = async () => {
+  const resolvePlayerIdentity = async () => {
     try {
       const profile = (await getDoc(doc(db, 'users', auth.currentUser.uid))).data()?.profile
       const preferred = profile?.isAnonymous ? profile.alias : auth.currentUser.displayName
       const name = String(preferred || '').trim().slice(0, 36)
-      return seat => name || PLAYER_NAMES[seat]
+      return seat => ({
+        name: name || PLAYER_NAMES[seat],
+        countryCode: String(profile?.countryCode || '').slice(0, 2).toUpperCase(),
+        avatarUrl: profile?.isAnonymous ? '' : String(auth.currentUser.photoURL || '').slice(0, 500)
+      })
     } catch {
       // Never reveal a name when the privacy preference cannot be loaded.
-      return seat => PLAYER_NAMES[seat]
+      return seat => ({ name: PLAYER_NAMES[seat], countryCode: '', avatarUrl: '' })
     }
   }
 
@@ -135,9 +139,11 @@ export const useQuietRoom = () => {
     if (auth.currentUser) await remove(databaseRef(rtdb, activePath(auth.currentUser.uid))).catch(() => {})
   }
 
-  const playerPayload = (seat, name = PLAYER_NAMES[seat]) => ({
+  const playerPayload = (seat, identity = {}) => ({
     uid: auth.currentUser.uid,
-    name,
+    name: identity.name || PLAYER_NAMES[seat],
+    countryCode: identity.countryCode || '',
+    avatarUrl: identity.avatarUrl || '',
     connected: true,
     joinedAt: serverTimestamp(),
     lastSeen: serverTimestamp(),
@@ -367,7 +373,7 @@ export const useQuietRoom = () => {
           reason: current.meta.status === 'lobby' ? 'full' : 'started'
         }
         const candidates = [...ROOM_SLOTS]
-        const playerName = await resolvePlayerNames()
+        const playerIdentity = await resolvePlayerIdentity()
         let claimed = false
         for (const candidate of candidates) {
           const seatRef = databaseRef(rtdb, roomPath(code) + '/players/' + candidate)
@@ -375,7 +381,7 @@ export const useQuietRoom = () => {
             const stale = value?.uid && value.connected === false &&
               Date.now() - Number(value.disconnectedAt || value.lastSeen || 0) > ROOM_GRACE_MS
             if (value?.uid && !stale) return
-            return playerPayload(candidate, playerName(candidate))
+            return playerPayload(candidate, playerIdentity(candidate))
           }, { applyLocally: false })
           if (result.committed) {
             seat = candidate
@@ -390,10 +396,10 @@ export const useQuietRoom = () => {
       localSeat.value = seat
       snapshot = await get(target)
       room.value = snapshot.val()
-      const playerName = await resolvePlayerNames()
-      const currentName = playerName(seat)
-      if (room.value?.meta?.status !== 'ended' && room.value?.players?.[seat]?.name !== currentName) {
-        await update(databaseRef(rtdb, roomPath(code) + '/players/' + seat), { name: currentName })
+      const playerIdentity = await resolvePlayerIdentity()
+      const currentIdentity = playerIdentity(seat)
+      if (room.value?.meta?.status !== 'ended') {
+        await update(databaseRef(rtdb, roomPath(code) + '/players/' + seat), currentIdentity)
       }
       await rememberRoom(code)
       if (room.value?.meta?.status !== 'ended') await attachPresence()
@@ -420,7 +426,7 @@ export const useQuietRoom = () => {
     if (!auth.currentUser) return { ok: false, reason: 'auth' }
     isBusy.value = true
     try {
-      const playerName = await resolvePlayerNames()
+      const playerIdentity = await resolvePlayerIdentity()
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const code = createRoomCode()
         const target = databaseRef(rtdb, roomPath(code))
@@ -444,7 +450,7 @@ export const useQuietRoom = () => {
             schemaVersion: 2
           },
           players: {
-            one: playerPayload('one', playerName('one'))
+            one: playerPayload('one', playerIdentity('one'))
           }
         }
         const result = await runTransaction(target, current => current ? undefined : initial, { applyLocally: false })
@@ -483,6 +489,22 @@ export const useQuietRoom = () => {
     } finally {
       isBusy.value = false
     }
+  }
+
+  // A rematch opens a fresh private room so the completed result remains
+  // immutable. The old room receives only a pointer that other travelers can
+  // choose to follow from their own result screen.
+  const createRematch = async (passageIndex, options = {}) => {
+    if (!hasEnded.value || !isHost.value || !roomCode.value) return { ok: false, reason: 'host' }
+    const previousCode = roomCode.value
+    const result = await createRoom(passageIndex, 'private', options)
+    if (!result.ok) return result
+    await set(databaseRef(rtdb, roomPath(previousCode) + '/meta/rematch'), {
+      code: result.code,
+      wordCount: Number(options.wordCount) || 50,
+      createdAt: serverTimestamp()
+    }).catch(error => { roomError.value = friendlyError(error) })
+    return result
   }
 
   const resumeRoom = async () => {
@@ -593,6 +615,7 @@ export const useQuietRoom = () => {
     createRoom,
     joinRoom,
     joinPublicRoom,
+    createRematch,
     resumeRoom,
     startMatch,
     leaveRoom,

@@ -2,6 +2,7 @@ export const ROOM_CODE_LENGTH = 7
 export const ROOM_GRACE_MS = 30_000
 export const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
 export const PUBLIC_START_DELAY_MS = 30_000
+export const MATCH_RITUAL_MS = 3_600
 export const MATCH_IDLE_MS = 30_000
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 5
@@ -79,7 +80,8 @@ export const isRoomExpired = (meta, now = Date.now()) => {
 export const forfeitReason = (player, startedAt, now = Date.now()) => {
   if (!player?.uid || player.complete) return null
   if (player.connected === false) return 'disconnected'
-  const lastActivity = Math.max(Number(startedAt) || 0, Number(player.lastActiveAt) || 0)
+  const firstPlayableMoment = (Number(startedAt) || 0) + MATCH_RITUAL_MS
+  const lastActivity = Math.max(firstPlayableMoment, Number(player.lastActiveAt) || 0)
   return lastActivity && now - lastActivity >= MATCH_IDLE_MS ? 'idle' : null
 }
 
