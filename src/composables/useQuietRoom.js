@@ -480,15 +480,45 @@ export const useQuietRoom = () => {
 
       for (const [code] of entries) {
         const result = await joinRoom(code, { fromMatchmaking: true })
-        if (result.ok) return result
+        if (result.ok) return { ...result, matchmaking: 'joined' }
         if (['missing', 'expired', 'full', 'started'].includes(result.reason)) {
           await remove(databaseRef(rtdb, openPath(code))).catch(() => {})
         }
       }
-      return await createRoom(passageIndex, 'public', options)
+      const result = await createRoom(passageIndex, 'public', options)
+      return result.ok ? { ...result, matchmaking: 'created' } : result
     } finally {
       isBusy.value = false
     }
+  }
+
+  const proposeRematch = async (wordCount = 50) => {
+    if (!hasEnded.value || !isHost.value || !roomCode.value || !localSeat.value) return { ok: false, reason: 'host' }
+    const selected = [50, 100, 200].includes(Number(wordCount)) ? Number(wordCount) : 50
+    await set(databaseRef(rtdb, roomPath(roomCode.value) + '/meta/rematch'), {
+      wordCount: selected,
+      createdAt: serverTimestamp(),
+      ready: {
+        [localSeat.value]: {
+          uid: auth.currentUser.uid,
+          name: localPlayer.value?.name || PLAYER_NAMES[localSeat.value],
+          at: serverTimestamp()
+        }
+      }
+    }).catch(error => { roomError.value = friendlyError(error) })
+    return { ok: true }
+  }
+
+  const setRematchReady = async ready => {
+    if (!hasEnded.value || !roomCode.value || !localSeat.value || !auth.currentUser) return { ok: false, reason: 'room' }
+    const target = databaseRef(rtdb, roomPath(roomCode.value) + '/meta/rematch/ready/' + localSeat.value)
+    if (!ready) await remove(target).catch(error => { roomError.value = friendlyError(error) })
+    else await set(target, {
+      uid: auth.currentUser.uid,
+      name: localPlayer.value?.name || PLAYER_NAMES[localSeat.value],
+      at: serverTimestamp()
+    }).catch(error => { roomError.value = friendlyError(error) })
+    return { ok: true }
   }
 
   // A rematch opens a fresh private room so the completed result remains
@@ -497,12 +527,14 @@ export const useQuietRoom = () => {
   const createRematch = async (passageIndex, options = {}) => {
     if (!hasEnded.value || !isHost.value || !roomCode.value) return { ok: false, reason: 'host' }
     const previousCode = roomCode.value
+    const ready = Object.keys(room.value?.meta?.rematch?.ready || {}).length
+    if (ready < MIN_PLAYERS) return { ok: false, reason: 'players' }
     const result = await createRoom(passageIndex, 'private', options)
     if (!result.ok) return result
-    await set(databaseRef(rtdb, roomPath(previousCode) + '/meta/rematch'), {
+    await update(databaseRef(rtdb, roomPath(previousCode) + '/meta/rematch'), {
       code: result.code,
       wordCount: Number(options.wordCount) || 50,
-      createdAt: serverTimestamp()
+      openedAt: serverTimestamp()
     }).catch(error => { roomError.value = friendlyError(error) })
     return result
   }
@@ -615,6 +647,8 @@ export const useQuietRoom = () => {
     createRoom,
     joinRoom,
     joinPublicRoom,
+    proposeRematch,
+    setRematchReady,
     createRematch,
     resumeRoom,
     startMatch,

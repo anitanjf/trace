@@ -8,6 +8,7 @@ Players choose Short Breath (50 words), Steady Breath (100 words), or Deep Exhal
 
 - A private-room host chooses the length for everyone invited.
 - Public matchmaking only groups players who selected the same word count.
+- Public search reports whether it is listening, has opened a new page, has found nearby lights, or is nearing the synchronized start.
 - The exact generated passage is stored in the room so every browser receives identical text.
 
 ## Race language
@@ -22,7 +23,7 @@ A disconnected seat remains reserved for 30 seconds. Returning through Home → 
 
 An active match ends with an ink-mark message when fewer than two connected travelers remain.
 
-Completed results remain readable until each traveler leaves. They include WPM, clarity, time, mistakes, flags or public avatars when shared, and quiet personal milestones. A private host can open a new 50, 100, or 200-word room from the result screen; the completed room keeps a rematch pointer so the other travelers can choose to follow. Public players can return directly to matchmaking for the same length.
+Completed results remain readable until each traveler leaves. They include WPM, clarity, time, mistakes, flags or public avatars when shared, and quiet personal milestones. A private host can propose a new 50, 100, or 200-word passage from the result screen. Each traveler answers independently, the host sees every ready/waiting state, and the next private room can open after at least two lights are ready. The completed room keeps a rematch pointer so ready travelers can choose when to follow. Public players can return directly to matchmaking for the same length.
 
 Match arrivals, starts, finishes, and results use the existing **Interface & match cues** preference. They stay silent when that preference is off.
 

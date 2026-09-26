@@ -62,8 +62,14 @@
             ".write": "auth != null"
           },
           "rematch": {
-            ".write": "auth != null && root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() === 'ended' && !data.exists()",
-            ".validate": "newData.hasChildren(['code', 'wordCount', 'createdAt']) && newData.child('code').isString() && newData.child('code').val().matches(/^[A-HJ-NP-Z2-9]{7}$/) && (newData.child('wordCount').val() === 50 || newData.child('wordCount').val() === 100 || newData.child('wordCount').val() === 200) && newData.child('createdAt').isNumber()"
+            ".write": "auth != null && root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() === 'ended'",
+            ".validate": "newData.hasChildren(['wordCount', 'createdAt', 'ready']) && (newData.child('wordCount').val() === 50 || newData.child('wordCount').val() === 100 || newData.child('wordCount').val() === 200) && newData.child('createdAt').isNumber() && (!data.exists() || (newData.child('wordCount').val() === data.child('wordCount').val() && newData.child('createdAt').val() === data.child('createdAt').val())) && (!newData.child('code').exists() || (newData.child('code').isString() && newData.child('code').val().matches(/^[A-HJ-NP-Z2-9]{7}$/))) && (!newData.child('openedAt').exists() || newData.child('openedAt').isNumber())",
+            "ready": {
+              "$seat": {
+                ".write": "auth != null && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() === 'ended' && ($seat === 'one' || $seat === 'two' || $seat === 'three' || $seat === 'four' || $seat === 'five') && root.child('multiplayerRooms/' + $roomId + '/players/' + $seat + '/uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)",
+                ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'at']) && newData.child('uid').isString() && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 36 && newData.child('at').isNumber())"
+              }
+            }
           },
           "forfeits": {
             "$seat": {
