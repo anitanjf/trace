@@ -12,6 +12,7 @@ import {
   isRoomExpired,
   MAX_PLAYERS,
   MATCH_IDLE_MS,
+  MATCH_RITUAL_MS,
   MIN_PLAYERS,
   PUBLIC_START_DELAY_MS,
   ROOM_GRACE_MS,
@@ -24,6 +25,7 @@ import {
 assert.equal(MIN_PLAYERS, 2)
 assert.equal(MAX_PLAYERS, 5)
 assert.equal(MATCH_IDLE_MS, 30_000)
+assert.equal(MATCH_RITUAL_MS, 3_600)
 assert.equal(PUBLIC_START_DELAY_MS, 30_000)
 assert.deepEqual(ROOM_SLOTS, ['one', 'two', 'three', 'four', 'five'])
 assert.deepEqual(WORD_COUNTS, [50, 100, 200])
@@ -84,7 +86,7 @@ const contestants = {
   four: { uid: 'finished', connected: false, complete: true }
 }
 assert.equal(forfeitReason(contestants.one, started, now - 1), null)
-assert.equal(forfeitReason(contestants.one, started, now), 'idle')
+assert.equal(forfeitReason(contestants.one, started - MATCH_RITUAL_MS, now), 'idle')
 assert.equal(forfeitReason(contestants.two, started, now), null)
 assert.equal(forfeitReason(contestants.three, started, now), 'disconnected')
 assert.equal(forfeitReason(contestants.four, started, now), null)

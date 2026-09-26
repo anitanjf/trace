@@ -304,7 +304,7 @@ const chooseSeason = index => {
             </fieldset>
 
             <div class="grid md:grid-cols-2 gap-4">
-              <div v-for="sound in [{ key: 'keystrokeSound', volume: 'keystrokeVolume', title: 'Keystrokes', note: 'Warm ink taps while typing' }, { key: 'interfaceSound', volume: 'interfaceVolume', title: 'Interface clicks', note: 'Soft response on buttons' }]" :key="sound.key" class="px-1 py-2 sm:px-3 sm:py-3">
+              <div v-for="sound in [{ key: 'keystrokeSound', volume: 'keystrokeVolume', title: 'Keystrokes', note: 'Warm ink taps while typing' }, { key: 'interfaceSound', volume: 'interfaceVolume', title: 'Interface & match cues', note: 'Soft buttons, arrivals, starts, and finishes' }]" :key="sound.key" class="px-1 py-2 sm:px-3 sm:py-3">
                 <h3 class="text-xs uppercase tracking-widest">{{ sound.title }}</h3>
                 <p class="text-[9px] uppercase tracking-wide opacity-50 mt-1 mb-4">{{ sound.note }}</p>
                 <div class="grid grid-cols-2 gap-2">
