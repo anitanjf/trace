@@ -2,11 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fallbackQuotes, seasons } from '../utils/constants'
-import { currentUser, settings, recordMultiplayerMatch } from '../store'
+import { currentUser, settings, stats, recordMultiplayerMatch } from '../store'
 import { publishLeaderboardResult } from '../services/leaderboard'
+import { playMatchCue } from '../composables/useAudio'
+import { countryFlag } from '../utils/countries'
 import {
   buildSharedPassage,
   MAX_PLAYERS,
+  MATCH_RITUAL_MS,
   MIN_PLAYERS,
   ROOM_CODE_LENGTH,
   WORD_COUNTS,
@@ -28,6 +31,9 @@ const showAuth = ref(false)
 const pendingAction = ref(null)
 const countdown = ref(0)
 const matchNow = ref(Date.now())
+const rematchWordCount = ref(50)
+const personalBest = ref(false)
+const lastCueStage = ref('')
 let countdownTimer = null
 let matchClockTimer = null
 
@@ -47,6 +53,7 @@ const {
   isBusy,
   serverOffset,
   createRoom: createOnlineRoom,
+  createRematch,
   joinRoom,
   joinPublicRoom,
   resumeRoom,
@@ -72,8 +79,15 @@ const roomWordCount = computed(() => Number(room.value?.meta?.wordCount) || sele
 const forfeits = computed(() => room.value?.meta?.forfeits || {})
 const localForfeit = computed(() => forfeits.value[localSeat.value] || null)
 const idleRemaining = computed(() => Math.max(0, 30 - Math.floor(
-  (matchNow.value + serverOffset.value - Math.max(Number(room.value?.meta?.startedAt || 0), Number(localPlayer.value?.lastActiveAt || 0))) / 1000
+  (matchNow.value + serverOffset.value - Math.max(Number(room.value?.meta?.startedAt || 0) + MATCH_RITUAL_MS, Number(localPlayer.value?.lastActiveAt || 0))) / 1000
 )))
+const ritualElapsed = computed(() => room.value?.meta?.startedAt
+  ? matchNow.value + serverOffset.value - Number(room.value.meta.startedAt)
+  : 0)
+const ritualActive = computed(() => isPlaying.value && ritualElapsed.value < MATCH_RITUAL_MS)
+const ritualStage = computed(() => ritualElapsed.value < 1100
+  ? 'Settle'
+  : ritualElapsed.value < 2300 ? 'Breathe' : 'Begin')
 const finishers = computed(() => [...players.value].sort((a, b) => {
   if (Boolean(forfeits.value[a.seat]) !== Boolean(forfeits.value[b.seat])) return forfeits.value[a.seat] ? 1 : -1
   if (a.complete !== b.complete) return a.complete ? -1 : 1
@@ -90,10 +104,40 @@ const fireflyColors = {
 }
 
 const winner = computed(() => finishers.value.find(player => !forfeits.value[player.seat]) || null)
+const raceWhisper = computed(() => {
+  if (!isPlaying.value || ritualActive.value || !localPlayer.value || localPlayer.value.complete) return ''
+  const active = players.value.filter(player => !forfeits.value[player.seat])
+  if (active.length < 2) return 'Keep your light with the line.'
+  const sorted = [...active].sort((a, b) => Number(b.progress || 0) - Number(a.progress || 0))
+  const place = sorted.findIndex(player => player.seat === localSeat.value)
+  const leaderGap = Number(sorted[0]?.progress || 0) - Number(localPlayer.value.progress || 0)
+  const nearest = active
+    .filter(player => player.seat !== localSeat.value)
+    .map(player => Math.abs(Number(player.progress || 0) - Number(localPlayer.value.progress || 0)))
+    .sort((a, b) => a - b)[0]
+  if (place === 0 && leaderGap === 0) return 'Your light is nearest the dawn.'
+  if (nearest <= 3) return 'Another light moves beside yours.'
+  if (leaderGap <= 10) return 'The leading glow is only a breath ahead.'
+  return 'Follow the page; distant lights may meet again.'
+})
+const resultMilestones = computed(() => {
+  const player = localPlayer.value
+  if (!player || !player.complete || localForfeit.value) return []
+  const notes = []
+  if (personalBest.value) notes.push('A new personal current')
+  if (Number(player.accuracy) === 100) notes.push('A perfectly clear passage')
+  if (winner.value?.seat === localSeat.value) notes.push('First light to shore')
+  if (Number(player.mistakes) > 0 && Number(player.accuracy) >= 90) notes.push('Found calm after a stumble')
+  return notes.slice(0, 3)
+})
 const publishedLeaderboardRooms = new Set()
 watch([hasEnded, localPlayer], ([ended, player]) => {
   if (!ended || !player || !roomCode.value || !currentUser.value) return
   const ranked = finishers.value
+  const priorBest = Math.max(0, ...Object.entries(stats.value.multiplayerMatches || {})
+    .filter(([code, match]) => code !== roomCode.value && Number(match.wordCount) === roomWordCount.value && match.finished)
+    .map(([, match]) => Number(match.wpm) || 0))
+  personalBest.value = Boolean(player.complete && !forfeits.value[player.seat] && Number(player.wpm) > priorBest)
   recordMultiplayerMatch({
     roomCode: roomCode.value,
     wordCount: roomWordCount.value,
@@ -131,6 +175,21 @@ watch([() => room.value?.meta?.startsAt, serverOffset], ([startsAt]) => {
   countdownTimer = setInterval(update, 250)
 })
 
+watch([ritualActive, ritualStage], ([active, stage]) => {
+  if (!active || lastCueStage.value === stage) return
+  lastCueStage.value = stage
+  playMatchCue(stage === 'Begin' ? 'begin' : 'settle')
+})
+watch(() => localPlayer.value?.complete, (complete, previous) => {
+  if (complete && !previous) playMatchCue('finish')
+})
+watch(hasEnded, (ended, previous) => {
+  if (ended && !previous) playMatchCue('results')
+})
+watch(lobbyCount, (count, previous) => {
+  if (isLobby.value && Number.isFinite(previous) && count > previous) playMatchCue('arrival')
+})
+
 const describeFailure = result => ({
   invalid: 'Enter the full ' + ROOM_CODE_LENGTH + '-character invitation.',
   missing: 'That invitation could not be found.',
@@ -151,6 +210,7 @@ const finishEntry = result => {
   }
   passageIndex.value = result.passageIndex
   selectedWordCount.value = Number(room.value?.meta?.wordCount) || selectedWordCount.value
+  rematchWordCount.value = selectedWordCount.value
   joinCode.value = room.value?.meta?.type === 'private' ? result.code : ''
   router.replace({ query: room.value?.meta?.type === 'private' ? { room: result.code } : {} })
 }
@@ -162,14 +222,35 @@ const withAuth = action => {
   return true
 }
 
-const passageOptions = () => {
+const passageOptions = (wordCount = selectedWordCount.value) => {
   const seed = Math.floor(Math.random() * 10_000)
-  const generated = buildSharedPassage(fallbackQuotes, selectedWordCount.value, seed)
+  const generated = buildSharedPassage(fallbackQuotes, wordCount, seed)
   return {
-    wordCount: selectedWordCount.value,
+    wordCount,
     passageText: generated.text,
     passageAuthor: generated.author
   }
+}
+
+const openRematch = async () => {
+  joinError.value = ''
+  const count = Number(rematchWordCount.value) || roomWordCount.value
+  const result = await createRematch(Math.floor(Math.random() * fallbackQuotes.length), passageOptions(count))
+  finishEntry(result)
+}
+
+const joinRematch = async () => {
+  const code = room.value?.meta?.rematch?.code
+  if (!code) return
+  await leaveRoom()
+  finishEntry(await joinRoom(code))
+}
+
+const findAnother = async () => {
+  const count = roomWordCount.value
+  await leaveRoom()
+  selectedWordCount.value = count
+  await findPublic()
 }
 
 const enterRoom = async code => {
@@ -218,7 +299,7 @@ const copyInvitation = async () => {
 }
 
 onMounted(async () => {
-  matchClockTimer = setInterval(() => { matchNow.value = Date.now() }, 1000)
+  matchClockTimer = setInterval(() => { matchNow.value = Date.now() }, 100)
   const requested = normalizeRoomCode(route.query.room)
   if (requested.length === ROOM_CODE_LENGTH) await enterRoom(requested)
   else if (currentUser.value) finishEntry(await resumeRoom())
@@ -341,7 +422,7 @@ watch(currentUser, async user => {
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.11]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
             <p class="text-[9px] uppercase tracking-[0.2em] opacity-60 mb-5">Here together · {{ lobbyCount }}/{{ MAX_PLAYERS }}</p>
             <ol class="space-y-2">
-              <li v-for="index in MAX_PLAYERS" :key="index" class="flex items-center justify-between gap-3 min-h-10 text-xs" :class="players[index - 1] ? '' : 'opacity-45'">
+              <li v-for="index in MAX_PLAYERS" :key="index" class="flex items-center justify-between gap-3 min-h-10 text-xs" :class="players[index - 1] ? 'traveler-arrival' : 'opacity-45'">
                 <template v-if="players[index - 1]">
                   <span class="flex min-w-0 items-center gap-3 font-ui-serif tracking-wide"><i class="shrink-0 w-2 h-2 rounded-full firefly-idle" :style="{ color: fireflyColors[players[index - 1].seat], backgroundColor: fireflyColors[players[index - 1].seat] }"></i><span class="min-w-0 truncate" :title="players[index - 1].name">{{ players[index - 1].name }}</span> <small v-if="players[index - 1].seat === localSeat" class="opacity-60">you</small></span>
                   <span class="shrink-0 text-[8px] uppercase tracking-[0.1em] opacity-55">{{ players[index - 1].connected === false ? 'Returning' : 'Here' }}</span>
@@ -353,15 +434,22 @@ watch(currentUser, async user => {
         </div>
 
         <div v-else-if="isPlaying">
-          <p v-if="!localPlayer?.complete && !localForfeit && room?.meta?.startedAt" class="mb-3 text-center text-[10px] uppercase tracking-[0.14em] opacity-60" role="timer">{{ idleRemaining }}s until your light rests without a keystroke</p>
+          <p v-if="!ritualActive && !localPlayer?.complete && !localForfeit && room?.meta?.startedAt" class="mb-2 text-center text-[10px] uppercase tracking-[0.14em] opacity-60" role="timer">{{ idleRemaining }}s until your light rests without a keystroke</p>
+          <p v-if="raceWhisper" class="mb-4 text-center font-ui-serif text-sm opacity-70" role="status">{{ raceWhisper }}</p>
           <p v-if="Object.keys(forfeits).length" class="mb-4 text-center text-[10px] tracking-wide opacity-70" role="status">{{ Object.keys(forfeits).length }} {{ Object.keys(forfeits).length === 1 ? 'traveler has' : 'travelers have' }} left the passage · the current continues while two lights remain.</p>
           <section class="relative isolate min-h-[31rem] flex items-center justify-center px-2 py-7 sm:px-5">
             <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.1]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
-            <div v-if="localPlayer?.complete" class="text-center px-6 py-12" role="status" aria-live="polite">
+            <div v-if="ritualActive" class="match-ritual text-center px-6 py-12" role="status" aria-live="polite">
+              <div class="ritual-orbit mx-auto mb-8" aria-hidden="true"><i v-for="player in players" :key="player.seat" :style="{ '--ritual-color': fireflyColors[player.seat] }"></i></div>
+              <p class="text-[9px] uppercase tracking-[0.3em] opacity-55 mb-5">The page grows quiet</p>
+              <Transition name="ritual-word" mode="out-in"><h2 :key="ritualStage" class="font-ui-serif text-4xl sm:text-5xl tracking-[0.16em]">{{ ritualStage }}</h2></Transition>
+            </div>
+            <div v-else-if="localPlayer?.complete" class="text-center px-6 py-12" role="status" aria-live="polite">
               <p class="text-[9px] uppercase tracking-[0.25em] opacity-60 mb-5">Your light has reached the shore</p>
               <span class="mx-auto mb-7 block w-5 h-5 rounded-full firefly-idle" :style="{ color: fireflyColors[localSeat], backgroundColor: fireflyColors[localSeat] }"></span>
               <h2 class="font-ui-serif text-2xl sm:text-3xl mb-4">Rest here while the others finish.</h2>
               <p class="text-xs opacity-65">Your passage is complete · {{ players.filter(player => player.complete && !forfeits[player.seat]).length }} of {{ players.filter(player => !forfeits[player.seat]).length }} lights have arrived.</p>
+              <p class="mt-4 text-[10px] uppercase tracking-[0.16em] opacity-55">{{ localPlayer.wpm }} WPM · {{ localPlayer.accuracy }}% clarity · {{ localPlayer.mistakes || 0 }} tangled keys</p>
             </div>
             <TypingBoard
               v-else-if="!localForfeit"
@@ -376,26 +464,45 @@ watch(currentUser, async user => {
           </section>
         </div>
 
-        <div v-else-if="hasEnded" class="relative isolate mx-auto max-w-3xl px-7 py-12 text-center">
+        <div v-else-if="hasEnded" class="relative isolate mx-auto max-w-4xl px-6 sm:px-10 py-11 text-center">
           <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-3xl opacity-[0.23]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
           <p class="text-[9px] uppercase tracking-[0.25em] opacity-55 mb-4">The page is complete</p>
           <h2 class="font-ui-serif text-2xl sm:text-3xl mb-3">{{ winner ? winner.name + ' reached the shore first.' : 'The passage rests here.' }}</h2>
           <p class="text-xs opacity-60">{{ roomWordCount }} words · Every traveler followed the same passage in their own time.</p>
+          <div v-if="resultMilestones.length" class="mt-5 flex flex-wrap justify-center gap-2" aria-label="Milestones from this match">
+            <span v-for="note in resultMilestones" :key="note" class="rounded-full border px-3 py-1 text-[9px] uppercase tracking-[0.12em]" :style="{ borderColor: 'var(--trace-border)' }">{{ note }}</span>
+          </div>
           <ol class="my-9 grid grid-cols-1 sm:grid-cols-3 gap-4 items-end" aria-label="First three travelers">
             <li v-for="(player, index) in finishers.slice(0, 3)" :key="player.seat" class="relative isolate flex flex-col items-center gap-2 px-4 py-7" :class="index === 0 ? 'sm:py-10' : ''">
               <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl" :style="{ backgroundColor: 'var(--trace-season-ink)', opacity: index === 0 ? .25 : .12, filter: 'url(#ink-blot)' }"></span>
               <span class="text-[9px] uppercase tracking-[0.24em] opacity-55">{{ index === 0 ? 'First light' : index === 1 ? 'Second light' : 'Third light' }}</span>
-              <span class="grid place-items-center w-14 h-14 rounded-full font-ui-serif text-lg" :style="{ backgroundColor: fireflyColors[player.seat] + '33', boxShadow: `0 0 22px ${fireflyColors[player.seat]}55` }" aria-hidden="true">{{ playerInitials(player.name) }}</span>
+              <span class="grid place-items-center w-14 h-14 overflow-hidden rounded-full font-ui-serif text-lg" :style="{ backgroundColor: fireflyColors[player.seat] + '33', boxShadow: `0 0 22px ${fireflyColors[player.seat]}55` }" aria-hidden="true"><img v-if="player.avatarUrl" :src="player.avatarUrl" alt="" class="w-full h-full object-cover" referrerpolicy="no-referrer" /><template v-else>{{ playerInitials(player.name) }}</template></span>
               <strong class="font-ui-serif font-normal text-base truncate max-w-full" :title="player.name">{{ player.name }} <small v-if="player.seat === localSeat" class="opacity-60">(you)</small></strong>
+              <span v-if="player.countryCode" class="text-base" :title="player.countryCode">{{ countryFlag(player.countryCode) }}</span>
               <span class="text-[9px] uppercase tracking-[0.14em] opacity-60">{{ forfeits[player.seat] ? 'DNF · ' + forfeits[player.seat].reason : player.complete ? 'Finished' : 'Last light standing' }}</span>
               <span class="mt-2 font-ui-serif text-xl tabular-nums">{{ player.keystrokes ? player.wpm : '—' }} <small class="text-[9px] font-ui-sans uppercase tracking-widest opacity-60">WPM</small></span>
-              <span class="text-[10px] opacity-70 tabular-nums">{{ player.keystrokes ? player.accuracy + '% accuracy' : 'No typing recorded' }} · {{ matchTime(player.elapsedMs) }}</span>
+              <span class="text-[10px] opacity-70 tabular-nums">{{ player.keystrokes ? player.accuracy + '% clarity · ' + (player.mistakes || 0) + ' mistakes' : 'No typing recorded' }}</span>
+              <span class="text-[10px] opacity-60 tabular-nums">{{ matchTime(player.elapsedMs) }}</span>
             </li>
           </ol>
           <ol v-if="finishers.length > 3" class="mx-auto max-w-sm mb-8 space-y-3 text-left" start="4" aria-label="Other travelers">
             <li v-for="(player, index) in finishers.slice(3)" :key="player.seat" class="flex flex-wrap gap-x-3 gap-y-1 text-xs"><span>{{ index + 4 }}.</span><span class="flex-1">{{ player.name }}</span><span class="opacity-60">{{ forfeits[player.seat] ? 'DNF' : player.complete ? 'Finished' : 'Still here' }} · {{ player.keystrokes ? player.wpm + ' WPM · ' + player.accuracy + '%' : 'No typing recorded' }} · {{ matchTime(player.elapsedMs) }}</span></li>
           </ol>
-          <InkButton variant="primary" @click="leave">Back to multiplayer</InkButton>
+          <div v-if="isPrivate && isHost" class="mx-auto mb-7 max-w-md">
+            <p class="mb-3 text-[9px] uppercase tracking-[0.2em] opacity-55">Open another page</p>
+            <div class="grid grid-cols-3 gap-2 mb-4">
+              <button v-for="count in WORD_COUNTS" :key="count" type="button" class="min-h-10 rounded-full border text-[10px] tracking-widest transition-opacity" :class="rematchWordCount === count ? 'opacity-100' : 'opacity-45'" :style="{ borderColor: 'var(--trace-border)' }" @click="rematchWordCount = count">{{ count }} words</button>
+            </div>
+            <InkButton variant="primary" :disabled="isBusy" @click="openRematch">{{ isBusy ? 'Opening…' : 'Host a rematch' }}</InkButton>
+          </div>
+          <div v-else-if="isPrivate && room?.meta?.rematch?.code" class="mb-7">
+            <p class="font-ui-serif text-lg mb-3">A new page is gathering.</p>
+            <InkButton variant="primary" @click="joinRematch">Join {{ room.meta.rematch.wordCount }}-word rematch</InkButton>
+          </div>
+          <div class="flex flex-wrap justify-center gap-3">
+            <InkButton v-if="!isPrivate" variant="primary" :disabled="isBusy" @click="findAnother">Find another match</InkButton>
+            <InkButton variant="soft" @click="leave">Leave results</InkButton>
+          </div>
         </div>
       </section>
     </div>
@@ -418,11 +525,23 @@ watch(currentUser, async user => {
 :deep(.room-leave-button.trace-ink-button::before) { opacity: .26; }
 :deep(.room-leave-button.trace-ink-button:hover::before) { opacity: .42; }
 .firefly-idle { box-shadow: 0 0 .45rem currentColor; animation: multiplayer-pulse 2.8s ease-in-out infinite; }
+.traveler-arrival { animation: traveler-arrival .7s cubic-bezier(.16, 1, .3, 1) both; }
+.ritual-orbit { position: relative; width: 7rem; height: 3rem; }
+.ritual-orbit i { position: absolute; left: 50%; top: 50%; width: .38rem; height: .38rem; border-radius: 50%; color: var(--ritual-color); background: currentColor; box-shadow: 0 0 .65rem .2rem currentColor; animation: ritual-drift 2.8s ease-in-out infinite; }
+.ritual-orbit i:nth-child(2) { animation-delay: -.7s; }
+.ritual-orbit i:nth-child(3) { animation-delay: -1.4s; }
+.ritual-orbit i:nth-child(4) { animation-delay: -2.1s; }
+.ritual-orbit i:nth-child(5) { animation-delay: -2.6s; }
+.ritual-word-enter-active, .ritual-word-leave-active { transition: opacity .3s ease, transform .3s ease, filter .3s ease; }
+.ritual-word-enter-from { opacity: 0; transform: translateY(.5rem); filter: blur(5px); }
+.ritual-word-leave-to { opacity: 0; transform: translateY(-.45rem); filter: blur(5px); }
 @keyframes multiplayer-pulse {
   0%, 100% { opacity: .35; transform: scale(.85); }
   50% { opacity: .95; transform: scale(1.15); }
 }
+@keyframes traveler-arrival { from { opacity: 0; transform: translateY(.5rem); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes ritual-drift { 0%, 100% { transform: translate(-3rem, .4rem) scale(.75); opacity: .45; } 50% { transform: translate(2.7rem, -.6rem) scale(1.15); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .firefly-idle { transition: none; animation: none; }
+  .firefly-idle, .traveler-arrival, .ritual-orbit i { transition: none; animation: none; }
 }
 </style>
