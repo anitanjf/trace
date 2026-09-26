@@ -34,6 +34,7 @@ const matchNow = ref(Date.now())
 const rematchWordCount = ref(50)
 const personalBest = ref(false)
 const lastCueStage = ref('')
+const matchmakingPhase = ref('idle')
 let countdownTimer = null
 let matchClockTimer = null
 
@@ -53,6 +54,8 @@ const {
   isBusy,
   serverOffset,
   createRoom: createOnlineRoom,
+  proposeRematch,
+  setRematchReady,
   createRematch,
   joinRoom,
   joinPublicRoom,
@@ -130,6 +133,21 @@ const resultMilestones = computed(() => {
   if (Number(player.mistakes) > 0 && Number(player.accuracy) >= 90) notes.push('Found calm after a stumble')
   return notes.slice(0, 3)
 })
+const matchmakingMessage = computed(() => {
+  if (matchmakingPhase.value === 'searching') return 'Listening for nearby lights…'
+  if (!isLobby.value || isPrivate.value) return ''
+  if (lobbyCount.value >= MAX_PLAYERS) return 'All five lights have found the page.'
+  if (lobbyCount.value < MIN_PLAYERS) return matchmakingPhase.value === 'created'
+    ? 'A page is open. Listening for another light…'
+    : 'The room is listening for one more light…'
+  if (countdown.value <= 10) return 'The page is almost ready. New lights may still arrive.'
+  return `${lobbyCount.value} lights have gathered. The circle remains open.`
+})
+const rematchProposal = computed(() => room.value?.meta?.rematch || null)
+const rematchReadyEntries = computed(() => Object.entries(rematchProposal.value?.ready || {})
+  .map(([seat, entry]) => ({ seat, ...entry })))
+const localRematchReady = computed(() => Boolean(rematchProposal.value?.ready?.[localSeat.value]))
+const rematchEligibleCount = computed(() => finishers.value.filter(player => !forfeits.value[player.seat]).length)
 const publishedLeaderboardRooms = new Set()
 watch([hasEnded, localPlayer], ([ended, player]) => {
   if (!ended || !player || !roomCode.value || !currentUser.value) return
@@ -234,9 +252,19 @@ const passageOptions = (wordCount = selectedWordCount.value) => {
 
 const openRematch = async () => {
   joinError.value = ''
-  const count = Number(rematchWordCount.value) || roomWordCount.value
+  const count = Number(rematchProposal.value?.wordCount || rematchWordCount.value) || roomWordCount.value
   const result = await createRematch(Math.floor(Math.random() * fallbackQuotes.length), passageOptions(count))
   finishEntry(result)
+}
+
+const inviteRematch = async () => {
+  joinError.value = ''
+  await proposeRematch(rematchWordCount.value)
+}
+
+const toggleRematchReady = async () => {
+  joinError.value = ''
+  await setRematchReady(!localRematchReady.value)
 }
 
 const joinRematch = async () => {
@@ -273,7 +301,10 @@ const createPrivate = async () => {
 const findPublic = async () => {
   joinError.value = ''
   if (withAuth({ type: 'public' })) return
-  finishEntry(await joinPublicRoom(Math.floor(Math.random() * fallbackQuotes.length), passageOptions()))
+  matchmakingPhase.value = 'searching'
+  const result = await joinPublicRoom(Math.floor(Math.random() * fallbackQuotes.length), passageOptions())
+  matchmakingPhase.value = result.ok ? (result.matchmaking || 'joined') : 'idle'
+  finishEntry(result)
 }
 
 const returnHome = async () => {
@@ -372,6 +403,11 @@ watch(currentUser, async user => {
           </article>
         </div>
 
+        <div v-if="matchmakingPhase === 'searching'" class="mb-6 flex items-center justify-center gap-3 text-center" role="status" aria-live="polite">
+          <span class="matchmaking-ripple" aria-hidden="true"><i></i><i></i><i></i></span>
+          <p class="font-ui-serif text-sm opacity-75">{{ matchmakingMessage }}</p>
+        </div>
+
         <div class="relative isolate px-5 py-5 sm:px-7">
           <span aria-hidden="true" class="absolute inset-0 -z-10 rounded-2xl opacity-[0.1]" :style="{ backgroundColor: 'var(--trace-season-ink)', filter: 'url(#ink-blot)' }"></span>
           <div class="flex items-stretch gap-2">
@@ -403,7 +439,7 @@ watch(currentUser, async user => {
             <div>
               <p class="text-[9px] uppercase tracking-[0.24em] opacity-60 mb-5">{{ isPrivate ? 'Invitation only' : roomWordCount + ' words · open gathering' }}</p>
               <h2 class="font-ui-serif text-2xl sm:text-3xl leading-snug mb-3">{{ lobbyCount < MIN_PLAYERS ? 'A place for one more' : isPrivate ? 'Your circle is here' : 'The page opens soon' }}</h2>
-              <p class="text-xs leading-relaxed opacity-70 max-w-lg">{{ isPrivate ? 'Share your invitation. Your circle can begin with two to five people.' : lobbyCount < MIN_PLAYERS ? 'The 30-second gathering begins when a second traveler joins.' : 'Others may join this same passage until the 30 seconds are over, up to five in all.' }}</p>
+              <p class="text-xs leading-relaxed opacity-70 max-w-lg">{{ isPrivate ? 'Share your invitation. Your circle can begin with two to five people.' : matchmakingMessage }}</p>
             </div>
             <div class="mt-8 flex flex-wrap items-end gap-x-8 gap-y-4">
               <template v-if="!isPrivate && countdown > 0">
@@ -414,7 +450,7 @@ watch(currentUser, async user => {
                 <p class="text-[10px] opacity-65">{{ lobbyCount }}/{{ MAX_PLAYERS }} places filled · gathering stays open</p>
               </template>
               <InkButton v-else-if="isPrivate && isHost" variant="primary" :disabled="!canStart" class="uppercase tracking-[0.14em] text-[10px]" @click="startMatch">{{ canStart ? 'Begin shared passage' : 'Waiting for one more' }}</InkButton>
-              <span v-else class="text-[10px] uppercase tracking-[0.14em] opacity-65">{{ isPrivate ? 'Your host will begin when ready' : 'Listening for another traveler' }}</span>
+              <span v-else class="text-[10px] uppercase tracking-[0.14em] opacity-65">{{ isPrivate ? 'Your host will begin when ready' : matchmakingMessage }}</span>
             </div>
           </div>
 
@@ -489,15 +525,37 @@ watch(currentUser, async user => {
             <li v-for="(player, index) in finishers.slice(3)" :key="player.seat" class="flex flex-wrap gap-x-3 gap-y-1 text-xs"><span>{{ index + 4 }}.</span><span class="flex-1">{{ player.name }}</span><span class="opacity-60">{{ forfeits[player.seat] ? 'DNF' : player.complete ? 'Finished' : 'Still here' }} · {{ player.keystrokes ? player.wpm + ' WPM · ' + player.accuracy + '%' : 'No typing recorded' }} · {{ matchTime(player.elapsedMs) }}</span></li>
           </ol>
           <div v-if="isPrivate && isHost" class="mx-auto mb-7 max-w-md">
-            <p class="mb-3 text-[9px] uppercase tracking-[0.2em] opacity-55">Open another page</p>
-            <div class="grid grid-cols-3 gap-2 mb-4">
-              <button v-for="count in WORD_COUNTS" :key="count" type="button" class="min-h-10 rounded-full border text-[10px] tracking-widest transition-opacity" :class="rematchWordCount === count ? 'opacity-100' : 'opacity-45'" :style="{ borderColor: 'var(--trace-border)' }" @click="rematchWordCount = count">{{ count }} words</button>
-            </div>
-            <InkButton variant="primary" :disabled="isBusy" @click="openRematch">{{ isBusy ? 'Opening…' : 'Host a rematch' }}</InkButton>
+            <template v-if="!rematchProposal">
+              <p class="mb-3 text-[9px] uppercase tracking-[0.2em] opacity-55">Invite another passage</p>
+              <div class="grid grid-cols-3 gap-2 mb-4">
+                <button v-for="count in WORD_COUNTS" :key="count" type="button" class="min-h-10 rounded-full border text-[10px] tracking-widest transition-opacity" :class="rematchWordCount === count ? 'opacity-100' : 'opacity-45'" :style="{ borderColor: 'var(--trace-border)' }" @click="rematchWordCount = count">{{ count }} words</button>
+              </div>
+              <InkButton variant="primary" :disabled="isBusy" @click="inviteRematch">Invite a rematch</InkButton>
+            </template>
+            <template v-else>
+              <p class="font-ui-serif text-xl mb-2">Waiting for the lights to answer.</p>
+              <p class="text-[10px] opacity-65 mb-4">{{ rematchReadyEntries.length }} of {{ rematchEligibleCount }} ready · {{ rematchProposal.wordCount }} words</p>
+              <ul class="flex flex-wrap justify-center gap-2 mb-5" aria-label="Rematch readiness">
+                <li v-for="player in finishers.filter(entry => !forfeits[entry.seat])" :key="player.seat" class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-[9px]" :class="rematchProposal.ready?.[player.seat] ? 'opacity-100' : 'opacity-45'" :style="{ borderColor: 'var(--trace-border)' }">
+                  <i class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: rematchProposal.ready?.[player.seat] ? fireflyColors[player.seat] : 'transparent', border: `1px solid ${fireflyColors[player.seat]}` }"></i>{{ player.name }} · {{ rematchProposal.ready?.[player.seat] ? 'ready' : 'waiting' }}
+                </li>
+              </ul>
+              <InkButton variant="primary" :disabled="isBusy || rematchReadyEntries.length < MIN_PLAYERS" @click="openRematch">{{ rematchReadyEntries.length < MIN_PLAYERS ? 'Waiting for one more' : isBusy ? 'Opening…' : 'Open the next page' }}</InkButton>
+            </template>
           </div>
-          <div v-else-if="isPrivate && room?.meta?.rematch?.code" class="mb-7">
-            <p class="font-ui-serif text-lg mb-3">A new page is gathering.</p>
-            <InkButton variant="primary" @click="joinRematch">Join {{ room.meta.rematch.wordCount }}-word rematch</InkButton>
+          <div v-else-if="isPrivate && rematchProposal" class="mx-auto mb-7 max-w-md">
+            <template v-if="rematchProposal.code">
+              <p class="font-ui-serif text-lg mb-3">The next page is gathering.</p>
+              <InkButton variant="primary" @click="joinRematch">Join {{ rematchProposal.wordCount }}-word rematch</InkButton>
+            </template>
+            <template v-else>
+              <p class="font-ui-serif text-lg mb-2">Another {{ rematchProposal.wordCount }}-word passage is waiting.</p>
+              <p class="text-[10px] opacity-60 mb-4">{{ rematchReadyEntries.length }} of {{ rematchEligibleCount }} lights are ready.</p>
+              <InkButton :variant="localRematchReady ? 'soft' : 'primary'" @click="toggleRematchReady">{{ localRematchReady ? 'I need another breath' : 'Ready for the rematch' }}</InkButton>
+            </template>
+          </div>
+          <div v-else-if="isPrivate" class="mb-7">
+            <p class="font-ui-serif text-sm opacity-65">If the host opens another page, its invitation will appear here.</p>
           </div>
           <div class="flex flex-wrap justify-center gap-3">
             <InkButton v-if="!isPrivate" variant="primary" :disabled="isBusy" @click="findAnother">Find another match</InkButton>
@@ -525,6 +583,10 @@ watch(currentUser, async user => {
 :deep(.room-leave-button.trace-ink-button::before) { opacity: .26; }
 :deep(.room-leave-button.trace-ink-button:hover::before) { opacity: .42; }
 .firefly-idle { box-shadow: 0 0 .45rem currentColor; animation: multiplayer-pulse 2.8s ease-in-out infinite; }
+.matchmaking-ripple { position: relative; width: 2rem; height: 2rem; flex: 0 0 auto; }
+.matchmaking-ripple i { position: absolute; inset: 50% auto auto 50%; width: .32rem; height: .32rem; margin: -.16rem; border-radius: 50%; background: var(--trace-season-accent); box-shadow: 0 0 .45rem var(--trace-season-accent); animation: matchmaking-listen 1.8s ease-out infinite; }
+.matchmaking-ripple i:nth-child(2) { animation-delay: -.6s; }
+.matchmaking-ripple i:nth-child(3) { animation-delay: -1.2s; }
 .traveler-arrival { animation: traveler-arrival .7s cubic-bezier(.16, 1, .3, 1) both; }
 .ritual-orbit { position: relative; width: 7rem; height: 3rem; }
 .ritual-orbit i { position: absolute; left: 50%; top: 50%; width: .38rem; height: .38rem; border-radius: 50%; color: var(--ritual-color); background: currentColor; box-shadow: 0 0 .65rem .2rem currentColor; animation: ritual-drift 2.8s ease-in-out infinite; }
@@ -540,8 +602,9 @@ watch(currentUser, async user => {
   50% { opacity: .95; transform: scale(1.15); }
 }
 @keyframes traveler-arrival { from { opacity: 0; transform: translateY(.5rem); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+@keyframes matchmaking-listen { 0% { opacity: .9; transform: scale(.65); } 75%, 100% { opacity: 0; transform: scale(5); } }
 @keyframes ritual-drift { 0%, 100% { transform: translate(-3rem, .4rem) scale(.75); opacity: .45; } 50% { transform: translate(2.7rem, -.6rem) scale(1.15); opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
-  .firefly-idle, .traveler-arrival, .ritual-orbit i { transition: none; animation: none; }
+  .firefly-idle, .traveler-arrival, .ritual-orbit i, .matchmaking-ripple i { transition: none; animation: none; }
 }
 </style>
