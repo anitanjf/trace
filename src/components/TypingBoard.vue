@@ -11,11 +11,12 @@ const props = defineProps({
   passageNumber: { type: Number, required: true },
   gameMode: { type: String, required: true },
   isPaused: { type: Boolean, default: false },
+  inputLocked: { type: Boolean, default: false },
   multiplayerPlayers: { type: Array, default: () => [] },
   localSeat: { type: String, default: '' }
 })
 
-const emit = defineEmits(['passage-complete', 'progress', 'pause', 'resume'])
+const emit = defineEmits(['passage-complete', 'progress', 'pause', 'resume', 'board-ready'])
 
 const createSessionId = () =>
   globalThis.crypto?.randomUUID?.() || `session-${Date.now()}-${Math.random().toString(36).slice(2)}`
@@ -76,10 +77,15 @@ const cursorStyle = ref({ transform: 'translate(0px, 0px)', width: '0px', height
 const multiplayerFireflies = ref([])
 const multiplayerTargets = new Map()
 const multiplayerPositions = new Map()
+let multiplayerGlyphs = []
+let localFireflyLineTop = 0
 const multiplayerFieldSize = ref({ width: 0, height: 0 })
 let multiplayerFrame = null
 let lastMultiplayerFrame = 0
 let lastSoloTargetRefresh = 0
+let cameraRefreshUntil = 0
+let boardResizeObserver = null
+let boardReadyEmitted = false
 const cursorAbsoluteX = ref(-1000)
 const cursorAbsoluteY = ref(-1000)
 
@@ -112,7 +118,7 @@ const ensureActiveLineVisible = async () => {
 }
 
 const focusMobileInput = async () => {
-  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return
+  if (props.inputLocked || props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return
   mobileInputRef.value?.focus({ preventScroll: true })
   await ensureActiveLineVisible()
 }
@@ -225,6 +231,17 @@ const updateMultiplayerFireflies = async () => {
   }
   const localIndex = Math.min(spans.length - 1, typedCount.value)
   const localRect = characterRects(localIndex).lineRect
+  localFireflyLineTop = localRect.top
+  multiplayerGlyphs = Array.from(spans, (_, index) => {
+    const { lineRect, positionRect } = characterRects(index)
+    return {
+      x: positionRect.left - areaRect.left + positionRect.width / 2,
+      endX: positionRect.left - areaRect.left + positionRect.width,
+      y: lineRect.top - areaRect.top + lineRect.height / 2,
+      lineTop: lineRect.top,
+      lineHeight: lineRect.height
+    }
+  })
   const isSolo = props.gameMode !== 'multiplayer'
   const racers = isSolo
     ? ['one', 'two', 'three'].map(seat => ({ seat: `solo-${seat}`, connected: true }))
@@ -248,9 +265,19 @@ const updateMultiplayerFireflies = async () => {
     const charIndex = isSolo || player.seat === props.localSeat
       ? localIndex
       : Math.min(spans.length - 1, Math.round((progress / 100) * spans.length))
-    const { lineRect, positionRect } = characterRects(charIndex)
-    const x = positionRect.left - areaRect.left + (progress >= 100 ? positionRect.width : positionRect.width / 2) + (isSolo ? (index - 1) * 3 : 0)
-    const y = lineRect.top - areaRect.top + lineRect.height / 2
+    const glyph = multiplayerGlyphs[charIndex]
+    const x = (progress >= 100 ? glyph.endX : glyph.x) + (isSolo ? (index - 1) * 3 : 0)
+    const y = glyph.y
+    const previous = multiplayerTargets.get(player.seat)
+    const receivedAt = Date.now()
+    const sampleElapsed = Math.max(1, receivedAt - Number(previous?.receivedAt || receivedAt))
+    const rawVelocity = previous && progress >= Number(previous.progress || 0)
+      ? (progress - Number(previous.progress || 0)) / sampleElapsed
+      : 0
+    const wpmVelocity = (Math.max(0, Number(player.wpm) || 0) * 5 / Math.max(1, poemCharacters.value.length)) * (100 / 60_000)
+    const progressVelocity = isSolo || player.seat === props.localSeat
+      ? 0
+      : Math.min(.012, Math.max(0, rawVelocity, wpmVelocity * .82, Number(previous?.progressVelocity || 0) * .72))
 
     multiplayerTargets.set(player.seat, {
       seat: player.seat,
@@ -260,9 +287,12 @@ const updateMultiplayerFireflies = async () => {
       wpm: Math.max(0, Number(player.wpm) || 0),
       mistakes: Math.max(0, Number(player.mistakes) || 0),
       lastActiveAt: Number(player.lastActiveAt || 0),
+      progress,
+      progressVelocity,
+      receivedAt,
       x, y, index,
-      lineTop: lineRect.top,
-      visible: isSolo || Math.abs(lineRect.top - localRect.top) < Math.max(lineRect.height, localRect.height) * .7,
+      lineTop: glyph.lineTop,
+      visible: isSolo || Math.abs(glyph.lineTop - localRect.top) < Math.max(glyph.lineHeight, localRect.height) * .7,
       color: isSolo ? soloFireflyColor.value : playerFireflyColor(player.seat)
     })
   })
@@ -291,7 +321,7 @@ const animateMultiplayerFireflies = now => {
   lastMultiplayerFrame = now
   // The passage glides inside its clipped viewport; sample its real glyph
   // position as the CSS transition runs so the lights stay with the line.
-  if (props.gameMode !== 'multiplayer' && now - lastSoloTargetRefresh > 100) {
+  if ((props.gameMode !== 'multiplayer' || now < cameraRefreshUntil) && now - lastSoloTargetRefresh > 70) {
     lastSoloTargetRefresh = now
     void updateMultiplayerFireflies()
   }
@@ -300,7 +330,21 @@ const animateMultiplayerFireflies = now => {
   const lights = []
 
   for (const target of multiplayerTargets.values()) {
-    if (!target.visible) {
+    let targetX = target.x
+    let targetY = target.y
+    let targetLineTop = target.lineTop
+    let targetVisible = target.visible
+    if (props.gameMode === 'multiplayer' && target.seat !== props.localSeat && !target.complete && target.connected && multiplayerGlyphs.length) {
+      const horizon = Math.min(450, Math.max(0, Date.now() - target.receivedAt))
+      const predictedProgress = Math.min(100, target.progress + target.progressVelocity * horizon, target.progress + 2.5)
+      const predictedIndex = Math.min(multiplayerGlyphs.length - 1, Math.round((predictedProgress / 100) * multiplayerGlyphs.length))
+      const glyph = multiplayerGlyphs[predictedIndex]
+      targetX = predictedProgress >= 100 ? glyph.endX : glyph.x
+      targetY = glyph.y
+      targetLineTop = glyph.lineTop
+      targetVisible = Math.abs(glyph.lineTop - localFireflyLineTop) < glyph.lineHeight * .7
+    }
+    if (!targetVisible) {
       multiplayerPositions.delete(target.seat)
       continue
     }
@@ -309,20 +353,20 @@ const animateMultiplayerFireflies = now => {
     const phase = now / (target.complete ? 980 : 690 - pace * 150) + (target.index * Math.PI * 2) / Math.max(count, 2)
     let position = multiplayerPositions.get(target.seat)
     if (!position) {
-      position = { x: target.x, y: target.y, lineTop: target.lineTop, points: [], lastMistakes: target.mistakes, flutterUntil: 0 }
+      position = { x: targetX, y: targetY, lineTop: targetLineTop, points: [], lastMistakes: target.mistakes, flutterUntil: 0 }
       multiplayerPositions.set(target.seat, position)
     }
     if (target.mistakes > Number(position.lastMistakes || 0)) position.flutterUntil = now + 520
     position.lastMistakes = target.mistakes
-    if (Math.abs(position.lineTop - target.lineTop) > 8) {
+    if (Math.abs(position.lineTop - targetLineTop) > 8) {
       position.points = []
-      position.lineTop = target.lineTop
+      position.lineTop = targetLineTop
     }
     // Follow rapid keystrokes and line wraps with the same smooth movement;
     // only actual viewport resizing resets the path.
-    const easing = reduced ? 1 : 1 - Math.exp(-delta / 235)
-    position.x += (target.x - position.x) * easing
-    position.y += (target.y - position.y) * easing
+    const easing = reduced ? 1 : 1 - Math.exp(-delta / (target.seat === props.localSeat ? 165 : 205))
+    position.x += (targetX - position.x) * easing
+    position.y += (targetY - position.y) * easing
     const fluttering = now < Number(position.flutterUntil || 0)
     const resting = target.complete || !active
     const xAmplitude = target.complete ? 3 : resting ? 6 : 11 + pace * 5
@@ -444,6 +488,9 @@ const calculateLines = () => {
   } else if (wordWrappers.length > 0) {
     lineHeight.value = wordWrappers[0].getBoundingClientRect().height * 1.5;
   }
+  if ((props.gameMode === 'flow' || poemCharacters.value.length > 150) && lineHeight.value > 0 && !isKintsugi.value) {
+    viewportMaxHeight.value = `${lineHeight.value * 3.2}px`
+  }
 };
 
 const updateCursor = async () => {
@@ -505,7 +552,10 @@ watch(typedCount, () => {
 })
 watch(() => props.quote, () => { nextTick(calculateLines) })
 watch(() => props.multiplayerPlayers, updateMultiplayerFireflies, { deep: true })
-watch(scrollOffset, () => requestAnimationFrame(updateMultiplayerFireflies))
+watch(scrollOffset, () => {
+  cameraRefreshUntil = performance.now() + 900
+  requestAnimationFrame(updateMultiplayerFireflies)
+})
 
 const processCharacter = (char) => {
   isTypingActive.value = true
@@ -584,7 +634,7 @@ const handleKey = (e) => {
     return 
   }
 
-  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return 
+  if (props.inputLocked || props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) return
   if (e.keyCode === 229 || e.isComposing) return 
   if (e.code === 'Space') e.preventDefault()
   
@@ -649,7 +699,7 @@ const handleMobileInput = (e) => {
   // Let the IME keep its temporary composition text until compositionend.
   if (isComposing.value) return
 
-  if (props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) {
+  if (props.inputLocked || props.isPaused || isEntering.value || isTransitioning.value || isSweeping.value || isKintsugi.value) {
     syncMobileInput()
     return
   }
@@ -710,6 +760,10 @@ onMounted(() => {
   window.visualViewport?.addEventListener('resize', handleResize)
   if (props.gameMode === 'multiplayer' || !shouldReduceMotion()) multiplayerFrame = requestAnimationFrame(animateMultiplayerFireflies)
   updateMobileViewport()
+  if (typeof ResizeObserver !== 'undefined' && typingArea.value) {
+    boardResizeObserver = new ResizeObserver(handleResize)
+    boardResizeObserver.observe(typingArea.value)
+  }
   
   const enterDelay = props.gameMode === 'flow' ? 300 : 450
 
@@ -719,6 +773,15 @@ onMounted(() => {
        calculateLines(); 
        updateCursor();
        updateMultiplayerFireflies();
+       if (props.gameMode === 'multiplayer' && !boardReadyEmitted) {
+         Promise.resolve(document.fonts?.ready).finally(() => nextTick(() => {
+           calculateLines()
+           updateCursor()
+           updateMultiplayerFireflies()
+           boardReadyEmitted = true
+           emit('board-ready')
+         }))
+       }
     }, 50)
   }, enterDelay)
 })
@@ -728,6 +791,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('keydown', handleKey)
   window.removeEventListener('resize', handleResize)
   window.visualViewport?.removeEventListener('resize', handleResize)
+  boardResizeObserver?.disconnect()
   clearScheduledTimers()
   typingTimeout = null
   setPracticeAudioPaused(false)
@@ -761,7 +825,7 @@ onBeforeUnmount(() => {
         isMobileInputFocused ? 'border-[#DFBE73] text-[#DFBE73] bg-[#DFBE73]/10' : (settings?.darkMode ? 'border-stone-700 text-stone-300' : 'border-stone-300 text-stone-700'),
         props.isPaused ? 'opacity-50' : ''
       ]"
-      :disabled="props.isPaused"
+      :disabled="props.isPaused || props.inputLocked"
       :aria-pressed="isMobileInputFocused"
       aria-controls="mobile-typing-input"
       @click="focusMobileInput"
@@ -846,7 +910,7 @@ onBeforeUnmount(() => {
         @compositionend="handleCompositionEnd"
         autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
         class="mobile-capture-input absolute inset-0 w-full h-full opacity-0 z-30 cursor-text resize-none" 
-        :class="isKintsugi || isTransitioning || isSweeping ? 'pointer-events-none' : 'pointer-events-auto'"
+        :class="props.inputLocked || isKintsugi || isTransitioning || isSweeping ? 'pointer-events-none' : 'pointer-events-auto'"
         style="color: transparent; text-shadow: none;"
       />
 
@@ -858,7 +922,7 @@ onBeforeUnmount(() => {
              WebkitMaskImage: viewportMaxHeight !== 'none' ? 'linear-gradient(to bottom, transparent 0%, black 15%, black 85%, transparent 100%)' : 'none' 
            }">
           
-          <div ref="textContainer" class="relative z-10 w-full transition-all duration-[800ms] ease-in-out will-change-transform" 
+          <div ref="textContainer" class="relative z-10 w-full transition-transform duration-[650ms] ease-out will-change-transform"
                :style="{ ...readabilityStyle, transform: (isKintsugi || isSweeping || isTransitioning) ? 'translateY(0px)' : `translateY(-${scrollOffset}px)` }" 
                :class="fontClass">
             

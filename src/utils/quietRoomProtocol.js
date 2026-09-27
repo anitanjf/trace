@@ -2,6 +2,7 @@ export const ROOM_CODE_LENGTH = 7
 export const ROOM_GRACE_MS = 30_000
 export const ROOM_LIFETIME_MS = 6 * 60 * 60 * 1000
 export const PUBLIC_START_DELAY_MS = 30_000
+export const BOARD_PREPARE_MS = 8_000
 export const MATCH_RITUAL_MS = 3_600
 export const MATCH_IDLE_MS = 30_000
 export const MIN_PLAYERS = 2
@@ -118,6 +119,13 @@ export const shouldStartPublicRoom = (room, now = Date.now()) =>
   Number(room.meta.startsAt) > 0 &&
   now >= Number(room.meta.startsAt) &&
   getConnectedPlayers(room.players).length >= MIN_PLAYERS
+
+export const shouldBeginPreparedMatch = (room, now = Date.now()) => {
+  if (room?.meta?.status !== 'playing' || Number(room.meta.startedAt || 0) > 0) return false
+  const players = getMatchPlayers(room.players, room.meta.forfeits)
+  if (players.length < MIN_PLAYERS) return false
+  return players.every(player => player.boardReady === true) || now >= Number(room.meta.prepareBy || Infinity)
+}
 
 export const calculatePassageProgress = (typedText, passageText) => {
   const total = String(passageText || '').length || 1

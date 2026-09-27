@@ -52,6 +52,10 @@
           "startedAt": {
             ".write": "auth != null"
           },
+          "prepareBy": {
+            ".write": "auth != null",
+            ".validate": "!newData.exists() || newData.isNumber()"
+          },
           "startsAt": {
             ".write": "auth != null"
           },
@@ -85,7 +89,7 @@
         "players": {
           "$seat": {
             ".write": "auth != null && ($seat === 'one' || $seat === 'two' || $seat === 'three' || $seat === 'four' || $seat === 'five') && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.child('uid').val() === auth.uid && (!newData.exists() || newData.child('uid').val() === auth.uid)) || (data.child('connected').val() === false && data.child('disconnectedAt').isNumber() && now > data.child('disconnectedAt').val() + 30000 && newData.child('uid').val() === auth.uid) || (!newData.exists() && root.child('multiplayerRooms/' + $roomId + '/meta/hostUid').val() === auth.uid)) && root.child('multiplayerRooms/' + $roomId + '/meta/status').val() !== 'ended' && now < root.child('multiplayerRooms/' + $roomId + '/meta/expiresAt').val() && (!root.child('multiplayerRooms/' + $roomId + '/meta/hostDisconnectedAt').isNumber() || now <= root.child('multiplayerRooms/' + $roomId + '/meta/hostDisconnectedAt').val() + 30000)",
-            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'connected', 'joinedAt', 'lastSeen', 'progress', 'complete', 'finishOrder']) && newData.child('uid').isString() && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 36 && (!newData.child('countryCode').exists() || (newData.child('countryCode').isString() && (newData.child('countryCode').val() === '' || newData.child('countryCode').val().matches(/^[A-Z]{2}$/)))) && (!newData.child('avatarUrl').exists() || (newData.child('avatarUrl').isString() && newData.child('avatarUrl').val().length <= 500)) && newData.child('connected').isBoolean() && newData.child('joinedAt').isNumber() && newData.child('lastSeen').isNumber() && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 100 && newData.child('complete').isBoolean() && newData.child('finishOrder').isNumber() && (!newData.child('finishedAt').exists() || newData.child('finishedAt').isNumber()))"
+            ".validate": "!newData.exists() || (newData.hasChildren(['uid', 'name', 'connected', 'joinedAt', 'lastSeen', 'progress', 'complete', 'finishOrder']) && newData.child('uid').isString() && newData.child('name').isString() && newData.child('name').val().length > 0 && newData.child('name').val().length <= 36 && (!newData.child('countryCode').exists() || (newData.child('countryCode').isString() && (newData.child('countryCode').val() === '' || newData.child('countryCode').val().matches(/^[A-Z]{2}$/)))) && (!newData.child('avatarUrl').exists() || (newData.child('avatarUrl').isString() && newData.child('avatarUrl').val().length <= 500)) && (!newData.child('boardReady').exists() || newData.child('boardReady').isBoolean()) && (!newData.child('boardReadyAt').exists() || newData.child('boardReadyAt').isNumber()) && newData.child('connected').isBoolean() && newData.child('joinedAt').isNumber() && newData.child('lastSeen').isNumber() && newData.child('progress').isNumber() && newData.child('progress').val() >= 0 && newData.child('progress').val() <= 100 && newData.child('complete').isBoolean() && newData.child('finishOrder').isNumber() && (!newData.child('finishedAt').exists() || newData.child('finishedAt').isNumber()))"
           }
         }
       }
